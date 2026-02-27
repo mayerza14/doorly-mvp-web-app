@@ -1,0 +1,227 @@
+"use client";
+
+import { useEffect, useState, use } from "react";
+import { useRouter } from "next/navigation";
+import { AppShell } from "@/components/app-shell";
+import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/lib/supabaseClient";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, ArrowLeft, Save } from "lucide-react";
+import Link from "next/link";
+
+export default function EditarEspacioPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
+  const { id } = use(params);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Estado ampliado para abarcar todos los pasos de tu wizard original
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    price_daily: 0,
+    space_type: "",
+    size_m2: 0,
+    access_type: "",
+    area_label: "",
+    // Agregá tus arrays de fotos, amenities, etc.
+    // photos: [], 
+    // amenities: [],
+  });
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push("/auth");
+      return;
+    }
+
+    const fetchListing = async () => {
+      const { data, error } = await supabase
+        .from("listings")
+        .select("*")
+        .eq("id", id)
+        .eq("host_id", user.id)
+        .single();
+
+      if (error || !data) {
+        router.push("/dashboard");
+        return;
+      }
+
+      setFormData({
+        title: data.title || "",
+        description: data.description || "",
+        price_daily: data.price_daily || 0,
+        space_type: data.space_type || "",
+        size_m2: data.size_m2 || 0,
+        access_type: data.access_type || "",
+        area_label: data.area_label || "",
+        // Mapear el resto de tus datos acá
+      });
+      setIsLoading(false);
+    };
+
+    fetchListing();
+  }, [id, user, authLoading, router]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === "price_daily" || name === "size_m2" ? Number(value) : value,
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+
+    const { error } = await supabase
+      .from("listings")
+      .update({
+        ...formData,
+        status: "pending_review", 
+        rejection_reason: null,   
+        updated_at: new Date().toISOString(), // Esto es CLAVE para el panel de Admin
+      })
+      .eq("id", id)
+      .eq("host_id", user?.id);
+
+    setIsSaving(false);
+
+    if (error) {
+      alert("Hubo un error al guardar los cambios.");
+    } else {
+      router.push("/dashboard");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell>
+      <div className="container max-w-4xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <Button variant="ghost" asChild className="-ml-4">
+            <Link href="/dashboard">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver al panel
+            </Link>
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSaving}>
+            {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            Guardar y enviar a revisión
+          </Button>
+        </div>
+
+        <h1 className="text-3xl font-bold mb-6">Editar publicación</h1>
+
+        <Tabs defaultValue="basico" className="w-full">
+          <TabsList className="grid w-full grid-cols-4 mb-8">
+            <TabsTrigger value="basico">Información Básica</TabsTrigger>
+            <TabsTrigger value="detalles">Detalles y Acceso</TabsTrigger>
+            <TabsTrigger value="ubicacion">Ubicación</TabsTrigger>
+            <TabsTrigger value="fotos">Fotos</TabsTrigger>
+          </TabsList>
+
+          <form id="edit-form" onSubmit={handleSubmit}>
+            
+            {/* PESTAÑA 1: BÁSICO */}
+            <TabsContent value="basico">
+              <Card>
+                <CardHeader><CardTitle>Información Básica</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Título</Label>
+                    <Input id="title" name="title" value={formData.title} onChange={handleChange} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Descripción</Label>
+                    <Textarea id="description" name="description" value={formData.description} onChange={handleChange} rows={5} required />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="price_daily">Precio por día ($)</Label>
+                      <Input id="price_daily" name="price_daily" type="number" value={formData.price_daily} onChange={handleChange} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="space_type">Tipo de espacio</Label>
+                      <Input id="space_type" name="space_type" value={formData.space_type} onChange={handleChange} required />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* PESTAÑA 2: DETALLES */}
+            <TabsContent value="detalles">
+              <Card>
+                <CardHeader><CardTitle>Detalles y Acceso</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="size_m2">Tamaño (m²)</Label>
+                      <Input id="size_m2" name="size_m2" type="number" value={formData.size_m2} onChange={handleChange} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="access_type">Tipo de Acceso</Label>
+                      <Input id="access_type" name="access_type" value={formData.access_type} onChange={handleChange} placeholder="Ej: 24_7, coordinado..." />
+                    </div>
+                  </div>
+                  {/* Acá podés pegar tus checkboxes de Amenities / Fits */}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* PESTAÑA 3: UBICACIÓN */}
+            <TabsContent value="ubicacion">
+              <Card>
+                <CardHeader><CardTitle>Ubicación</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="area_label">Zona / Barrio</Label>
+                    <Input id="area_label" name="area_label" value={formData.area_label} onChange={handleChange} />
+                  </div>
+                  {/* Acá podés pegar tu componente de Mapa de v0 */}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* PESTAÑA 4: FOTOS */}
+            <TabsContent value="fotos">
+              <Card>
+                <CardHeader><CardTitle>Fotos del Espacio</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-8 border-2 border-dashed rounded-lg text-center text-muted-foreground bg-muted/50">
+                    <p>Pegá acá el componente de subida de fotos que usaste en la página de publicar.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+          </form>
+        </Tabs>
+      </div>
+    </AppShell>
+  );
+}
