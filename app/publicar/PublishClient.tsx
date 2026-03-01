@@ -45,7 +45,6 @@ const SPACE_ATTRIBUTES = [
 
 const PHONE_REGEX = /(\+?54\s?)?(\d[\s\-.]?){8,12}\d/g;
 const EMAIL_REGEX = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
-const [cropFile, setCropFile] = useState<File | null>(null);
 
 // ── FIX 1: latExact y lngExact agregados a la interfaz ──
 interface FormData {
@@ -146,6 +145,7 @@ function PublishFormContent() {
   const [blockReason, setBlockReason] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);  
 
   const sizeM2 = formData.largo > 0 && formData.ancho > 0
     ? Math.round(formData.largo * formData.ancho * 100) / 100
