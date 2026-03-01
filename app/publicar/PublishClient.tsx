@@ -26,11 +26,7 @@ import { CalendarIcon, CheckCircle2, Loader2, Upload, X, AlertCircle, Plus } fro
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
-import dynamic from "next/dynamic";
-const PhotoCropModal = dynamic(
-  () => import("@/components/photo-crop-modal").then((m) => m.PhotoCropModal),
-  { ssr: false }
-);
+import { PhotoCropModal } from "@/components/photo-crop-modal";
 
 const SPACE_TYPES = [
   "Cochera", "Garage", "Depósito", "Baulera", "Galpón", "Espacio al aire libre", "Otro",
