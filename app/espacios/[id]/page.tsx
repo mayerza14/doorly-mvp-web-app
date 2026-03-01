@@ -48,10 +48,10 @@ export default async function EspacioDetailPage({
 
   // Traer fotos desde tabla listing_photos
   const { data: photosData } = await supabase
-    .from("listing_photos")
-    .select("url, order")
-    .eq("listing_id", id)
-    .order("order", { ascending: true });
+  .from("listing_photos")
+  .select("url, position")
+  .eq("listing_id", id)
+  .order("position", { ascending: true });
 
   // Traer reservas bloqueadas
   const { data: bookingsData, error: bookingsError } = await supabase
