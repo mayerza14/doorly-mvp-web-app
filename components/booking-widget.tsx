@@ -38,8 +38,6 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
       };
     });
 
-  console.log("Rangos bloqueados enviados al calendario:", disabledRanges);
-
   const calculatePrice = () => {
     if (!dateRange?.from || !dateRange?.to) return null;
 
@@ -146,14 +144,14 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
   };
 
   return (
-    <Card className="sticky top-20 shadow-lg border-primary/10">
-      <CardHeader>
+    <Card className="shadow-lg border-primary/10">
+      <CardHeader className="pb-3">
         <CardTitle className="flex items-baseline gap-2">
           <span className="text-2xl font-bold">${listing.priceDaily.toLocaleString()}</span>
           <span className="text-base font-normal text-muted-foreground">/ día</span>
         </CardTitle>
         {(listing.priceWeekly || listing.priceMonthly) && (
-          <div className="flex gap-2 flex-wrap mt-2">
+          <div className="flex gap-2 flex-wrap mt-1">
             {listing.priceWeekly && (
               <Badge variant="secondary" className="text-[10px] uppercase font-bold">
                 ${listing.priceWeekly.toLocaleString()}/semana
@@ -168,114 +166,120 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
         )}
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <label className="text-sm font-semibold">Seleccioná las fechas</label>
-          <div className="border border-border rounded-md p-3 bg-card">
-            <Calendar
-              mode="range"
-              selected={dateRange}
-              onSelect={setDateRange}
-              disabled={[{ before: new Date() }, ...disabledRanges]}
-              locale={es}
-              numberOfMonths={1}
-              className="rounded-md"
+      {/* ── Scroll interno: el card no crece, solo scrollea por dentro ── */}
+      <CardContent className="p-0">
+        <div className="overflow-y-auto max-h-[600px] px-6 pb-6 space-y-4">
+
+          {/* Calendario */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold">Seleccioná las fechas</label>
+            <div className="border border-border rounded-md p-3 bg-card">
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
+                disabled={[{ before: new Date() }, ...disabledRanges]}
+                locale={es}
+                numberOfMonths={1}
+                className="rounded-md"
+              />
+            </div>
+            {dateRange?.from && dateRange?.to && (
+              <div className="flex items-center gap-2 text-sm text-primary font-medium mt-2 bg-primary/5 p-2 rounded-md">
+                <CalendarIcon className="h-4 w-4" />
+                {format(dateRange.from, "d 'de' MMM", { locale: es })} -{" "}
+                {format(dateRange.to, "d 'de' MMM yyyy", { locale: es })}
+              </div>
+            )}
+          </div>
+
+          {/* Desglose de costos */}
+          {priceInfo && (
+            <div className="space-y-3 pt-4 border-t border-border">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Reserva por {priceInfo.breakdown}</span>
+                <span className="font-medium">${priceInfo.total.toLocaleString()}</span>
+              </div>
+
+              <div className="flex justify-between text-sm">
+                <div className="flex flex-col">
+                  <span className="flex items-center gap-1.5 font-medium text-foreground">
+                    Comisión Doorly
+                    <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none text-[9px] h-4 px-1.5 uppercase font-bold">
+                      Promo Lanzamiento
+                    </Badge>
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">Bonificación del 100% aplicada</span>
+                </div>
+                <div className="text-right">
+                  <span className="line-through text-muted-foreground text-xs mr-2">
+                    ${priceInfo.serviceFeeAmount.toLocaleString()}
+                  </span>
+                  <span className="text-green-600 font-bold">$0</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center border-t border-dashed pt-4 mt-2">
+                <span className="text-base font-bold text-foreground">Total a pagar</span>
+                <span className="text-2xl font-black text-primary">
+                  ${priceInfo.total.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="flex items-start gap-2 bg-blue-50/50 p-2 rounded-md border border-blue-100">
+                <Info className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
+                <p className="text-[10px] text-blue-700 leading-tight">
+                  No hay cargos adicionales. El precio final es el reflejado arriba.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Checkbox términos */}
+          <div className="flex items-start gap-2 pt-1">
+            <Checkbox
+              id="terms-booking"
+              checked={acceptedTerms}
+              onCheckedChange={(v) => setAcceptedTerms(v === true)}
             />
+            <Label
+              htmlFor="terms-booking"
+              className="text-xs font-normal text-muted-foreground leading-relaxed cursor-pointer"
+            >
+              Acepto los{" "}
+              <Link href="/terminos" target="_blank" className="text-primary underline underline-offset-2">
+                Términos y Condiciones
+              </Link>{" "}
+              y la{" "}
+              <Link href="/privacidad" target="_blank" className="text-primary underline underline-offset-2">
+                Política de Privacidad
+              </Link>{" "}
+              de Doorly
+            </Label>
           </div>
-          {dateRange?.from && dateRange?.to && (
-            <div className="flex items-center gap-2 text-sm text-primary font-medium mt-2 bg-primary/5 p-2 rounded-md">
-              <CalendarIcon className="h-4 w-4" />
-              {format(dateRange.from, "d 'de' MMM", { locale: es })} -{" "}
-              {format(dateRange.to, "d 'de' MMM yyyy", { locale: es })}
-            </div>
-          )}
-        </div>
 
-        {/* Desglose de costos */}
-        {priceInfo && (
-          <div className="space-y-3 pt-4 border-t border-border animate-in fade-in slide-in-from-top-1 duration-300">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Reserva por {priceInfo.breakdown}</span>
-              <span className="font-medium">${priceInfo.total.toLocaleString()}</span>
-            </div>
-
-            <div className="flex justify-between text-sm">
-              <div className="flex flex-col">
-                <span className="flex items-center gap-1.5 font-medium text-foreground">
-                  Comisión Doorly
-                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none text-[9px] h-4 px-1.5 uppercase font-bold">
-                    Promo Lanzamiento
-                  </Badge>
-                </span>
-                <span className="text-[10px] text-muted-foreground">Bonificación del 100% aplicada</span>
-              </div>
-              <div className="text-right">
-                <span className="line-through text-muted-foreground text-xs mr-2">
-                  ${priceInfo.serviceFeeAmount.toLocaleString()}
-                </span>
-                <span className="text-green-600 font-bold">$0</span>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center border-t border-dashed pt-4 mt-2">
-              <span className="text-base font-bold text-foreground">Total a pagar</span>
-              <span className="text-2xl font-black text-primary">
-                ${priceInfo.total.toLocaleString()}
-              </span>
-            </div>
-
-            <div className="flex items-start gap-2 bg-blue-50/50 p-2 rounded-md border border-blue-100">
-              <Info className="h-3.5 w-3.5 text-blue-500 mt-0.5" />
-              <p className="text-[10px] text-blue-700 leading-tight">
-                No hay cargos adicionales. El precio final es el reflejado arriba.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Checkbox términos */}
-        <div className="flex items-start gap-2 pt-1">
-          <Checkbox
-            id="terms-booking"
-            checked={acceptedTerms}
-            onCheckedChange={(v) => setAcceptedTerms(v === true)}
-          />
-          <Label
-            htmlFor="terms-booking"
-            className="text-xs font-normal text-muted-foreground leading-relaxed cursor-pointer"
+          <Button
+            onClick={handleReserve}
+            disabled={!dateRange?.from || !dateRange?.to || isReserving || !acceptedTerms}
+            className="w-full shadow-md hover:shadow-lg transition-all"
+            size="lg"
           >
-            Acepto los{" "}
-            <Link href="/terminos" target="_blank" className="text-primary underline underline-offset-2">
-              Términos y Condiciones
-            </Link>{" "}
-            y la{" "}
-            <Link href="/privacidad" target="_blank" className="text-primary underline underline-offset-2">
-              Política de Privacidad
-            </Link>{" "}
-            de Doorly
-          </Label>
+            {isReserving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Iniciando pago...
+              </>
+            ) : (
+              "Reservar ahora"
+            )}
+          </Button>
+
+          <p className="text-[11px] text-muted-foreground text-center leading-relaxed px-2">
+            Al hacer clic en "Reservar ahora", serás redirigido a Mercado Pago para completar la
+            operación de forma segura.
+          </p>
+
         </div>
-
-        <Button
-          onClick={handleReserve}
-          disabled={!dateRange?.from || !dateRange?.to || isReserving || !acceptedTerms}
-          className="w-full shadow-md hover:shadow-lg transition-all"
-          size="lg"
-        >
-          {isReserving ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Iniciando pago...
-            </>
-          ) : (
-            "Reservar ahora"
-          )}
-        </Button>
-
-        <p className="text-[11px] text-muted-foreground text-center leading-relaxed px-2">
-          Al hacer clic en "Reservar ahora", serás redirigido a Mercado Pago para completar la
-          operación de forma segura.
-        </p>
       </CardContent>
     </Card>
   );

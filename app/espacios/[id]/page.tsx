@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   MapPin, Maximize2, Clock, CheckCircle, XCircle, Star,
-  ShieldCheck, Package, Zap, Lock,
+  ShieldCheck, Package, Zap, Lock, Ruler,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { ListingMap } from "@/components/listing-map";
@@ -28,6 +28,7 @@ export default async function EspacioDetailPage({
 }) {
   const { id } = await params;
 
+  // Traer listing
   const { data: rawListing, error } = await supabase
     .from("listings")
     .select("*")
@@ -45,6 +46,14 @@ export default async function EspacioDetailPage({
     );
   }
 
+  // Traer fotos desde tabla listing_photos
+  const { data: photosData } = await supabase
+    .from("listing_photos")
+    .select("url, order")
+    .eq("listing_id", id)
+    .order("order", { ascending: true });
+
+  // Traer reservas bloqueadas
   const { data: bookingsData, error: bookingsError } = await supabase
     .from("bookings")
     .select("start_date, end_date")
@@ -59,6 +68,21 @@ export default async function EspacioDetailPage({
     endDate: b.end_date,
   }));
 
+  // Calcular superficie
+  const largo = rawListing.largo || 0;
+  const ancho = rawListing.ancho || 0;
+  const alto = rawListing.alto || 0;
+  const sizeM2 = rawListing.size_m2 || (largo > 0 && ancho > 0 ? Math.round(largo * ancho * 100) / 100 : 0);
+
+  // Fotos: primero tabla listing_photos, fallback a columna photos del listing
+  const photos = photosData && photosData.length > 0
+    ? photosData.map((p) => p.url).filter(Boolean)
+    : (rawListing.photos || rawListing.photo_urls || []);
+
+  const finalPhotos = photos.length > 0
+    ? photos
+    : ["/placeholder.jpg", "/placeholder.jpg", "/placeholder.jpg"];
+
   const listing = {
     ...rawListing,
     id: rawListing.id,
@@ -68,7 +92,10 @@ export default async function EspacioDetailPage({
     accessType: rawListing.access_type || "coordinado",
     accessHoursText: rawListing.access_hours_text || rawListing.access_notes_private || "",
     areaLabel: rawListing.area_label || "Ubicación a coordinar",
-    sizeM2: rawListing.size_m2 || 0,
+    largo,
+    ancho,
+    alto,
+    sizeM2,
     priceDaily: rawListing.price_daily || 0,
     priceWeekly: rawListing.price_weekly || null,
     priceMonthly: rawListing.price_monthly || null,
@@ -78,14 +105,8 @@ export default async function EspacioDetailPage({
     rulesNotAllowed: rawListing.rules_not_allowed || [],
     latExact: rawListing.lat_exact,
     lngExact: rawListing.lng_exact,
-    photos: rawListing.photos || [],
     doorly_certified: rawListing.doorly_certified || false,
   };
-
-  const photos =
-    listing.photos.length > 0
-      ? listing.photos
-      : ["/placeholder.jpg", "/placeholder.jpg", "/placeholder.jpg"];
 
   const approxCoords =
     listing.latExact && listing.lngExact
@@ -97,12 +118,10 @@ export default async function EspacioDetailPage({
       <div className="min-h-screen bg-background">
         <div className="container max-w-7xl mx-auto px-4 py-6 md:py-8">
 
-          {/* ══ BLOQUE SUPERIOR: foto izquierda + widget derecha ══
-              En mobile: columna única (widget debajo)
-              En desktop (lg): dos columnas lado a lado            */}
+          {/* ══ BLOQUE SUPERIOR: foto izquierda + widget derecha ══ */}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 lg:gap-10 items-start">
 
-            {/* ── IZQUIERDA: badges + título + carrusel ── */}
+            {/* ── IZQUIERDA ── */}
             <div className="space-y-4 min-w-0">
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -140,19 +159,16 @@ export default async function EspacioDetailPage({
                 </div>
               </div>
 
-              {/* Carrusel */}
-              <PhotoCarousel photos={photos} title={listing.title} />
+              <PhotoCarousel photos={finalPhotos} title={listing.title} />
             </div>
 
-            {/* ── DERECHA: widget ──
-                En mobile aparece debajo del carrusel (orden natural)
-                En desktop es sticky al lado                          */}
+            {/* ── DERECHA: widget ── */}
             <div className="lg:sticky lg:top-24">
               <BookingWidget listing={listing} blockedDates={blockedDates} />
             </div>
           </div>
 
-          {/* ══ BLOQUE INFERIOR: detalles completos ══ */}
+          {/* ══ BLOQUE INFERIOR ══ */}
           <div className="max-w-3xl mt-8 md:mt-10 space-y-8">
 
             {/* Descripción */}
@@ -163,12 +179,12 @@ export default async function EspacioDetailPage({
               </p>
             </div>
 
-            {/* Ideal para guardar */}
+            {/* Qué entra */}
             {listing.fits.length > 0 && (
               <div className="pb-8 border-b border-border">
                 <div className="flex items-center gap-2 mb-4">
                   <Package className="h-5 w-5 text-primary" />
-                  <h3 className="font-bold text-foreground text-lg">Ideal para guardar</h3>
+                  <h3 className="font-bold text-foreground text-lg">¿Qué entra en este espacio?</h3>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {listing.fits.map((fit: string) => (
@@ -184,28 +200,10 @@ export default async function EspacioDetailPage({
               </div>
             )}
 
-            {/* Atributos y seguridad */}
-            {listing.rulesAllowed.length > 0 && (
-              <div className="pb-8 border-b border-border">
-                <div className="flex items-center gap-2 mb-4">
-                  <ShieldCheck className="h-5 w-5 text-primary" />
-                  <h3 className="font-bold text-foreground text-lg">Atributos y seguridad</h3>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {listing.rulesAllowed.map((rule: string) => (
-                    <div key={rule} className="flex items-center gap-2.5 p-3 rounded-xl bg-green-50 border border-green-100">
-                      <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
-                      <span className="text-sm font-medium text-green-900">{rule}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ── TABS: 3 tabs (sin mapa) ── */}
+            {/* ── TABS ── */}
             <Tabs defaultValue="detalles" className="w-full">
               <TabsList className="w-full grid grid-cols-3 h-auto bg-muted/40 p-1 rounded-xl border border-border mb-6">
-                {["detalles", "condiciones", "resenas"].map((tab) => (
+                {["detalles", "atributos", "resenas"].map((tab) => (
                   <TabsTrigger
                     key={tab}
                     value={tab}
@@ -222,29 +220,55 @@ export default async function EspacioDetailPage({
               {/* TAB: DETALLES */}
               <TabsContent value="detalles" className="space-y-6">
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+
+                  {/* Dimensiones */}
                   <Card className="shadow-none border-border">
                     <CardContent className="p-5">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Maximize2 className="h-5 w-5 text-primary" />
-                        <span className="font-bold text-foreground">Tamaño total</span>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Ruler className="h-5 w-5 text-primary" />
+                        <span className="font-bold text-foreground">Dimensiones</span>
                       </div>
-                      <p className="text-muted-foreground">
-                        {listing.sizeM2 > 0 ? `${listing.sizeM2} m²` : "No especificado"}
-                      </p>
+                      {largo > 0 && ancho > 0 ? (
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Largo</span>
+                            <span className="font-medium">{largo} m</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Ancho</span>
+                            <span className="font-medium">{ancho} m</span>
+                          </div>
+                          {alto > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Alto</span>
+                              <span className="font-medium">{alto} m</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm pt-2 border-t border-border">
+                            <span className="text-muted-foreground font-medium">Superficie</span>
+                            <span className="font-bold text-primary">{sizeM2} m²</span>
+                          </div>
+                        </div>
+                      ) : sizeM2 > 0 ? (
+                        <p className="text-muted-foreground">{sizeM2} m²</p>
+                      ) : (
+                        <p className="text-muted-foreground text-sm italic">No especificado</p>
+                      )}
                     </CardContent>
                   </Card>
 
+                  {/* Acceso */}
                   <Card className="shadow-none border-border">
                     <CardContent className="p-5">
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-3">
                         <Clock className="h-5 w-5 text-primary" />
                         <span className="font-bold text-foreground">Acceso</span>
                       </div>
                       <p className="text-muted-foreground">
-                        {listing.accessType === "24_7" ? "Acceso libre 24/7" : "Horarios coordinados"}
+                        {listing.accessType === "24_7" ? "Libre 24/7" : "Horarios coordinados"}
                       </p>
                       {listing.accessHoursText && (
-                        <p className="text-sm mt-1 text-muted-foreground italic">
+                        <p className="text-sm mt-2 text-muted-foreground italic bg-muted/40 rounded-lg px-3 py-2">
                           "{listing.accessHoursText}"
                         </p>
                       )}
@@ -258,7 +282,7 @@ export default async function EspacioDetailPage({
                     <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
                       {listing.amenities.map((amenity: string) => (
                         <div key={amenity} className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-primary" />
+                          <CheckCircle className="h-4 w-4 text-primary shrink-0" />
                           <span className="text-sm text-muted-foreground">{amenity}</span>
                         </div>
                       ))}
@@ -267,8 +291,42 @@ export default async function EspacioDetailPage({
                 )}
               </TabsContent>
 
-              {/* TAB: CONDICIONES */}
-              <TabsContent value="condiciones" className="space-y-4">
+              {/* TAB: ATRIBUTOS */}
+              <TabsContent value="atributos" className="space-y-5">
+                {listing.rulesAllowed.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <ShieldCheck className="h-5 w-5 text-primary" />
+                      <h3 className="font-bold text-foreground">Atributos del espacio</h3>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {listing.rulesAllowed.map((rule: string) => (
+                        <div key={rule} className="flex items-center gap-2.5 p-3 rounded-xl bg-green-50 border border-green-100">
+                          <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                          <span className="text-sm font-medium text-green-900">{rule}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {listing.rulesNotAllowed.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <XCircle className="h-5 w-5 text-destructive" />
+                      <h3 className="font-bold text-foreground">Restricciones</h3>
+                    </div>
+                    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+                      {listing.rulesNotAllowed.map((rule: string) => (
+                        <div key={rule} className="flex items-start gap-2 bg-red-50 p-3 rounded-xl border border-red-100">
+                          <XCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                          <span className="text-sm text-red-900 font-medium">{rule}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                   <p className="text-sm text-amber-800 leading-relaxed">
                     <strong>Política de Doorly:</strong> Materiales peligrosos, armas, productos
@@ -276,21 +334,10 @@ export default async function EspacioDetailPage({
                     los espacios de la plataforma.
                   </p>
                 </div>
-                {listing.rulesNotAllowed.length > 0 ? (
-                  <div>
-                    <h3 className="font-bold text-foreground mb-4">Restricciones del propietario</h3>
-                    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-                      {listing.rulesNotAllowed.map((rule: string) => (
-                        <div key={rule} className="flex items-start gap-2 bg-red-50 p-3 rounded-xl border border-red-100">
-                          <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-                          <span className="text-sm text-red-900 font-medium">{rule}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    No hay restricciones adicionales declaradas por el propietario.
+
+                {listing.rulesAllowed.length === 0 && listing.rulesNotAllowed.length === 0 && (
+                  <p className="text-muted-foreground text-sm text-center py-4">
+                    No hay atributos ni restricciones declaradas por el propietario.
                   </p>
                 )}
               </TabsContent>
@@ -301,7 +348,7 @@ export default async function EspacioDetailPage({
               </TabsContent>
             </Tabs>
 
-            {/* ══ MAPA: siempre visible, FUERA de tabs ══ */}
+            {/* ══ MAPA ══ */}
             <div className="border-t border-border pt-8">
               <Card className="overflow-hidden border-border shadow-none">
                 <CardHeader className="bg-muted/30 border-b py-3 px-5">
@@ -339,7 +386,7 @@ export default async function EspacioDetailPage({
             </div>
 
             {/* ══ PREGUNTAS ══ */}
-            <div className="border-t border-border pt-8">
+            <div className="border-t border-border pt-8 pb-8">
               <ListingQuestions listingId={id} hostId={rawListing.host_id} />
             </div>
 
