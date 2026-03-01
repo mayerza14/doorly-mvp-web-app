@@ -25,7 +25,6 @@ import { es } from "date-fns/locale";
 import { CalendarIcon, CheckCircle2, Loader2, Upload, X, AlertCircle, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
-import { useRef } from "react";
 
 // ─── CONSTANTES ────────────────────────────────────────────────────────────────
 
