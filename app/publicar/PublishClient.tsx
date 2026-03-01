@@ -26,6 +26,7 @@ import { CalendarIcon, CheckCircle2, Loader2, Upload, X, AlertCircle, Plus } fro
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
+import { PhotoCropModal } from "@/components/photo-crop-modal";
 
 const SPACE_TYPES = [
   "Cochera", "Garage", "Depósito", "Baulera", "Galpón", "Espacio al aire libre", "Otro",
@@ -44,6 +45,7 @@ const SPACE_ATTRIBUTES = [
 
 const PHONE_REGEX = /(\+?54\s?)?(\d[\s\-.]?){8,12}\d/g;
 const EMAIL_REGEX = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+const [cropFile, setCropFile] = useState<File | null>(null);
 
 // ── FIX 1: latExact y lngExact agregados a la interfaz ──
 interface FormData {
@@ -614,28 +616,9 @@ function PublishFormContent() {
                         const toProcess = files.slice(0, remaining);
                         const oversized = toProcess.filter(f => f.size > 5 * 1024 * 1024);
                         if (oversized.length > 0) { alert(`${oversized.length} foto(s) superan los 5 MB.`); return; }
-                        setIsUploadingPhotos(true);
-                        try {
-                          const { data: { session } } = await supabase.auth.getSession();
-                          if (!session) throw new Error("No hay sesión activa");
-                          const uploadedUrls: string[] = [];
-                          for (const file of toProcess) {
-                            const compressed = await compressImage(file, 1200, 0.82);
-                            const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-                            const fileName = `${session.user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-                            const { error: uploadError } = await supabase.storage.from("listing-photos").upload(fileName, compressed, { contentType: file.type, upsert: false });
-                            if (uploadError) throw uploadError;
-                            const { data: urlData } = supabase.storage.from("listing-photos").getPublicUrl(fileName);
-                            uploadedUrls.push(urlData.publicUrl);
-                          }
-                          updateFormData("photos", [...formData.photos, ...uploadedUrls]);
-                        } catch (err: any) {
-                          console.error("Error subiendo fotos:", err);
-                          alert("No se pudo subir una o más fotos. Intentá de nuevo.");
-                        } finally {
-                          setIsUploadingPhotos(false);
-                          (e.target as HTMLInputElement).value = "";
-                        }
+                        // ✅ Solo abre el cropper — la subida ocurre en onConfirm del modal
+                        setCropFile(toProcess[0]);
+                        (e.target as HTMLInputElement).value = "";
                       }}
                     />
                   </div>
@@ -643,7 +626,7 @@ function PublishFormContent() {
                   {isUploadingPhotos && (
                     <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
                       <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
-                      <p className="text-sm text-primary font-medium">Subiendo y comprimiendo fotos...</p>
+                      <p className="text-sm text-primary font-medium">Subiendo foto...</p>
                     </div>
                   )}
 
@@ -652,7 +635,7 @@ function PublishFormContent() {
                       <p className="text-xs font-medium text-muted-foreground">{formData.photos.length}/10 fotos cargadas</p>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                         {formData.photos.map((url, idx) => (
-                          <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
+                          <div key={idx} className="relative rounded-lg overflow-hidden border border-border bg-muted" style={{ aspectRatio: "16/9" }}>
                             <img src={url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
                             {idx === 0 && <div className="absolute top-1.5 left-1.5 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded">Principal</div>}
                             <button type="button" onClick={() => updateFormData("photos", formData.photos.filter((_, i) => i !== idx))} className="absolute top-1.5 right-1.5 h-7 w-7 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-red-600 active:bg-red-700 transition-colors" aria-label="Eliminar foto">
@@ -661,7 +644,7 @@ function PublishFormContent() {
                           </div>
                         ))}
                         {formData.photos.length < 10 && (
-                          <button type="button" onClick={() => photoInputRef.current?.click()} className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 hover:border-primary/50 hover:bg-accent/20 transition-all">
+                          <button type="button" onClick={() => photoInputRef.current?.click()} className="rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 hover:border-primary/50 hover:bg-accent/20 transition-all" style={{ aspectRatio: "16/9" }}>
                             <Plus className="h-5 w-5 text-muted-foreground" />
                             <span className="text-[10px] text-muted-foreground">Agregar</span>
                           </button>
@@ -671,6 +654,22 @@ function PublishFormContent() {
                     </div>
                   )}
                   {errors.photos && <p className="text-sm text-destructive">{errors.photos}</p>}
+                </div>
+
+                {/* Atributos */}
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-base font-bold">Atributos del espacio</Label>
+                    <p className="text-xs text-muted-foreground mt-1">Seleccioná las características de seguridad y equipamiento que ofrece tu espacio.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {SPACE_ATTRIBUTES.map((attr) => (
+                      <div key={attr} className={`flex items-center space-x-3 p-3 rounded-xl border transition-all cursor-pointer hover:bg-accent/50 ${formData.rulesAllowed.includes(attr) ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`} onClick={() => toggleRule(attr)}>
+                        <Checkbox id={`attr-${attr}`} checked={formData.rulesAllowed.includes(attr)} onCheckedChange={() => toggleRule(attr)} onClick={(e) => e.stopPropagation()} />
+                        <Label htmlFor={`attr-${attr}`} className="text-sm font-medium cursor-pointer leading-none flex-1">{attr}</Label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Atributos */}
@@ -863,6 +862,32 @@ function PublishFormContent() {
           </CardContent>
         </Card>
       </div>
+      {cropFile && (
+          <PhotoCropModal
+            file={cropFile}
+            onConfirm={async (blob) => {
+              setCropFile(null);
+              setIsUploadingPhotos(true);
+              try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) throw new Error("No hay sesión activa");
+                const ext = cropFile.name.split(".").pop()?.toLowerCase() || "jpg";
+                const fileName = `${session.user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+                const { error: uploadError } = await supabase.storage
+                  .from("listing-photos")
+                  .upload(fileName, blob, { contentType: "image/jpeg", upsert: false });
+                if (uploadError) throw uploadError;
+                const { data: urlData } = supabase.storage.from("listing-photos").getPublicUrl(fileName);
+                updateFormData("photos", [...formData.photos, urlData.publicUrl]);
+              } catch (err) {
+                alert("No se pudo subir la foto. Intentá de nuevo.");
+              } finally {
+                setIsUploadingPhotos(false);
+              }
+            }}
+            onCancel={() => setCropFile(null)}
+          />
+        )}
     </AppShell>
   );
 }
