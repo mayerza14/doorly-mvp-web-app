@@ -671,22 +671,6 @@ function PublishFormContent() {
                     ))}
                   </div>
                 </div>
-
-                {/* Atributos */}
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-base font-bold">Atributos del espacio</Label>
-                    <p className="text-xs text-muted-foreground mt-1">Seleccioná las características de seguridad y equipamiento que ofrece tu espacio.</p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {SPACE_ATTRIBUTES.map((attr) => (
-                      <div key={attr} className={`flex items-center space-x-3 p-3 rounded-xl border transition-all cursor-pointer hover:bg-accent/50 ${formData.rulesAllowed.includes(attr) ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`} onClick={() => toggleRule(attr)}>
-                        <Checkbox id={`attr-${attr}`} checked={formData.rulesAllowed.includes(attr)} onCheckedChange={() => toggleRule(attr)} onClick={(e) => e.stopPropagation()} />
-                        <Label htmlFor={`attr-${attr}`} className="text-sm font-medium cursor-pointer leading-none flex-1">{attr}</Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </>
             )}
 
