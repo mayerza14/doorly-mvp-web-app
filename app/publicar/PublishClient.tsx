@@ -160,7 +160,6 @@ function PublishFormContent() {
     priceWeekly: undefined,
     priceMonthly: undefined,
     photos: [],
-    const photoInputRef = useRef<HTMLInputElement>(null);
   });
   const photoInputRef = useRef<HTMLInputElement>(null);
 
