@@ -25,6 +25,7 @@ import { es } from "date-fns/locale";
 import { CalendarIcon, CheckCircle2, Loader2, Upload, X, AlertCircle, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
+import { useRef } from "react";
 
 // ─── CONSTANTES ────────────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ const SPACE_ATTRIBUTES = [
 // Regex para detectar teléfonos y mails en la descripción
 const PHONE_REGEX = /(\+?54\s?)?(\d[\s\-.]?){8,12}\d/g;
 const EMAIL_REGEX = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
-
+const photoInputRef = useRef<HTMLInputElement>(null);
 // ─── TIPOS LOCALES ──────────────────────────────────────────────────────────────
 
 interface FormData {
@@ -710,165 +711,164 @@ function PublishFormContent() {
               </>
             )}
 
-            {/* ── PASO 2: Fotos y reglas ─────────────────────────────────────── */}
-{currentStep === 2 && (
-  <>
-    {/* Fotos */}
-    <div className="space-y-3">
-      <div>
-        <Label>Fotos del espacio * (mínimo 3, máximo 10)</Label>
-        <p className="text-xs text-muted-foreground mt-1">
-          Subí fotos claras y bien iluminadas. Los espacios con buenas fotos reciben hasta 3x más reservas.
-        </p>
-      </div>
-
-      {/* Zona de drop / selector */}
-      <div
-        className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/20 transition-all"
-        onClick={() => document.getElementById("photo-input")?.click()}
-      >
-        <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-        <p className="text-sm font-medium text-foreground mb-1">
-          Hacé click para seleccionar fotos
-        </p>
-        <p className="text-xs text-muted-foreground">
-          JPG, PNG o WEBP · Máximo 5 MB por foto · Hasta 10 fotos
-        </p>
-        <input
-          id="photo-input"
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          className="hidden"
-          onChange={async (e) => {
-            const files = Array.from(e.target.files || []);
-            if (!files.length) return;
-
-            const remaining = 10 - formData.photos.length;
-            if (remaining <= 0) {
-              alert("Ya tenés 10 fotos cargadas, que es el máximo permitido.");
-              return;
-            }
-
-            const toProcess = files.slice(0, remaining);
-            const oversized = toProcess.filter(f => f.size > 5 * 1024 * 1024);
-            if (oversized.length > 0) {
-              alert(`${oversized.length} foto(s) superan los 5 MB y no se pueden subir.`);
-              return;
-            }
-
-            setIsUploadingPhotos(true);
-
-            try {
-              const { data: { session } } = await supabase.auth.getSession();
-              if (!session) throw new Error("No hay sesión activa");
-
-              const uploadedUrls: string[] = [];
-
-              for (const file of toProcess) {
-                // Comprimir la imagen en el navegador
-                const compressed = await compressImage(file, 1200, 0.82);
-
-                const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-                const fileName = `${session.user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-                const { error: uploadError } = await supabase.storage
-                  .from("listing-photos")
-                  .upload(fileName, compressed, {
-                    contentType: file.type,
-                    upsert: false,
-                  });
-
-                if (uploadError) throw uploadError;
-
-                const { data: urlData } = supabase.storage
-                  .from("listing-photos")
-                  .getPublicUrl(fileName);
-
-                uploadedUrls.push(urlData.publicUrl);
-              }
-
-              updateFormData("photos", [...formData.photos, ...uploadedUrls]);
-            } catch (err: any) {
-              console.error("Error subiendo fotos:", err);
-              alert("No se pudo subir una o más fotos. Intentá de nuevo.");
-            } finally {
-              setIsUploadingPhotos(false);
-              // Reset input para poder subir el mismo archivo dos veces
-              (e.target as HTMLInputElement).value = "";
-            }
-          }}
-        />
-      </div>
-
-      {/* Estado de carga */}
-      {isUploadingPhotos && (
-        <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-          <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
-          <p className="text-sm text-primary font-medium">Subiendo y comprimiendo fotos...</p>
-        </div>
-      )}
-
-      {/* Preview de fotos cargadas */}
-      {formData.photos.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">
-            {formData.photos.length}/10 fotos cargadas
-          </p>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-            {formData.photos.map((url, idx) => (
-              <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-border bg-muted">
-                <img
-                  src={url}
-                  alt={`Foto ${idx + 1}`}
-                  className="w-full h-full object-cover"
-                />
-                {/* Badge foto principal */}
-                {idx === 0 && (
-                  <div className="absolute top-1.5 left-1.5 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded">
-                    Principal
-                  </div>
-                )}
-                {/* Botón eliminar */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newPhotos = formData.photos.filter((_, i) => i !== idx);
-                    updateFormData("photos", newPhotos);
-                  }}
-                  className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/70 text-white
-                             flex items-center justify-center opacity-0 group-hover:opacity-100
-                             transition-opacity hover:bg-red-600"
-                  aria-label="Eliminar foto"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
-
-            {/* Botón agregar más fotos */}
-            {formData.photos.length < 10 && (
-              <button
-                type="button"
-                onClick={() => document.getElementById("photo-input")?.click()}
-                className="aspect-square rounded-lg border-2 border-dashed border-border
-                           flex flex-col items-center justify-center gap-1
-                           hover:border-primary/50 hover:bg-accent/20 transition-all"
-              >
-                <Plus className="h-5 w-5 text-muted-foreground" />
-                <span className="text-[10px] text-muted-foreground">Agregar</span>
-              </button>
-            )}
+{/* ── PASO 2: Fotos ─────────────────────────────────────── */}
+    {currentStep === 2 && (
+      <>
+        {/* Fotos */}
+        <div className="space-y-3">
+          <div>
+            <Label>Fotos del espacio * (mínimo 3, máximo 10)</Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Subí fotos claras y bien iluminadas. Los espacios con buenas fotos reciben hasta 3x más reservas.
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            La primera foto será la portada del espacio. Pasá el cursor sobre una foto para eliminarla.
-          </p>
+
+          {/* Zona de drop / selector */}
+          <div
+            className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/20 transition-all"
+            onClick={() => photoInputRef.current?.click()}
+          >
+            <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+            <p className="text-sm font-medium text-foreground mb-1">
+              Hacé click para seleccionar fotos
+            </p>
+            <p className="text-xs text-muted-foreground">
+              JPG, PNG o WEBP · Máximo 5 MB por foto · Hasta 10 fotos
+            </p>
+            {/* ✅ Fix 1: accept="image/*" permite galería y cámara en iOS/Android */}
+            {/* ✅ Fix 2: ref en lugar de getElementById para iOS */}
+            <input
+              ref={photoInputRef}
+              id="photo-input"
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={async (e) => {
+                const files = Array.from(e.target.files || []);
+                if (!files.length) return;
+
+                const remaining = 10 - formData.photos.length;
+                if (remaining <= 0) {
+                  alert("Ya tenés 10 fotos cargadas, que es el máximo permitido.");
+                  return;
+                }
+
+                const toProcess = files.slice(0, remaining);
+                const oversized = toProcess.filter(f => f.size > 5 * 1024 * 1024);
+                if (oversized.length > 0) {
+                  alert(`${oversized.length} foto(s) superan los 5 MB y no se pueden subir.`);
+                  return;
+                }
+
+                setIsUploadingPhotos(true);
+
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) throw new Error("No hay sesión activa");
+
+                  const uploadedUrls: string[] = [];
+
+                  for (const file of toProcess) {
+                    const compressed = await compressImage(file, 1200, 0.82);
+                    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+                    const fileName = `${session.user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+                    const { error: uploadError } = await supabase.storage
+                      .from("listing-photos")
+                      .upload(fileName, compressed, {
+                        contentType: file.type,
+                        upsert: false,
+                      });
+
+                    if (uploadError) throw uploadError;
+
+                    const { data: urlData } = supabase.storage
+                      .from("listing-photos")
+                      .getPublicUrl(fileName);
+
+                    uploadedUrls.push(urlData.publicUrl);
+                  }
+
+                  updateFormData("photos", [...formData.photos, ...uploadedUrls]);
+                } catch (err: any) {
+                  console.error("Error subiendo fotos:", err);
+                  alert("No se pudo subir una o más fotos. Intentá de nuevo.");
+                } finally {
+                  setIsUploadingPhotos(false);
+                  (e.target as HTMLInputElement).value = "";
+                }
+              }}
+            />
+          </div>
+
+          {/* Estado de carga */}
+          {isUploadingPhotos && (
+            <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+              <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+              <p className="text-sm text-primary font-medium">Subiendo y comprimiendo fotos...</p>
+            </div>
+          )}
+
+          {/* Preview de fotos cargadas */}
+          {formData.photos.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                {formData.photos.length}/10 fotos cargadas
+              </p>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                {formData.photos.map((url, idx) => (
+                  <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
+                    <img
+                      src={url}
+                      alt={`Foto ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Badge foto principal */}
+                    {idx === 0 && (
+                      <div className="absolute top-1.5 left-1.5 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded">
+                        Principal
+                      </div>
+                    )}
+                    {/* ✅ Fix 3: botón eliminar siempre visible en mobile (no depende de hover) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newPhotos = formData.photos.filter((_, i) => i !== idx);
+                        updateFormData("photos", newPhotos);
+                      }}
+                      className="absolute top-1.5 right-1.5 h-7 w-7 rounded-full bg-black/70 text-white
+                                 flex items-center justify-center
+                                 hover:bg-red-600 active:bg-red-700 transition-colors"
+                      aria-label="Eliminar foto"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+
+                {/* Botón agregar más */}
+                {formData.photos.length < 10 && (
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    className="aspect-square rounded-lg border-2 border-dashed border-border
+                               flex flex-col items-center justify-center gap-1
+                               hover:border-primary/50 hover:bg-accent/20 transition-all"
+                  >
+                    <Plus className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-[10px] text-muted-foreground">Agregar</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                La primera foto será la portada. Tocá la X para eliminar una foto.
+              </p>
+            </div>
+          )}
+
+          {errors.photos && <p className="text-sm text-destructive">{errors.photos}</p>}
         </div>
-      )}
-
-      {errors.photos && <p className="text-sm text-destructive">{errors.photos}</p>}
-    </div>
-
     {/* Qué está permitido */}
     <div className="space-y-4">
       <div>

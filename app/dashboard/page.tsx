@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import {
   Plus, Eye, Edit, Loader2, MessageSquare, Calendar, Trash2,
-  AlertTriangle, User, Landmark, Save, ShieldCheck, AlertCircle,
+  AlertTriangle, User, Landmark, Save, ShieldCheck, AlertCircle, Pencil, Phone,
 } from "lucide-react";
 import { ChatWidget } from "@/components/chat-widget";
 import {
@@ -46,25 +46,39 @@ export default function DashboardPage() {
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [certificationModal, setCertificationModal] = useState<{
-    open: boolean;
-    listingId: string;
-    listingTitle: string;
+    open: boolean; listingId: string; listingTitle: string;
   }>({ open: false, listingId: "", listingTitle: "" });
+
+  // Payout
   const [hasPayoutMethod, setHasPayoutMethod] = useState(true);
   const [isLoadingPayout, setIsLoadingPayout] = useState(true);
   const [isSavingPayout, setIsSavingPayout] = useState(false);
   const [payoutMessage, setPayoutMessage] = useState({ type: "", text: "" });
   const [payoutData, setPayoutData] = useState({
+    fullName: "", cuitCuil: "", bankName: "", cbuCvu: "", alias: "",
+  });
+
+  // Perfil editable
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState({ type: "", text: "" });
+  const [profileData, setProfileData] = useState({
     fullName: "",
-    cuitCuil: "",
-    bankName: "",
-    cbuCvu: "",
-    alias: "",
+    phone: "",
   });
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/auth?returnUrl=/dashboard");
   }, [user, authLoading, router]);
+
+  // Cargar datos del perfil
+  useEffect(() => {
+    if (!user || !profile) return;
+    setProfileData({
+      fullName: profile.full_name || "",
+      phone: profile.phone || "",
+    });
+  }, [user, profile]);
 
   useEffect(() => {
     if (!user) return;
@@ -127,10 +141,7 @@ export default function DashboardPage() {
   const handleDeleteListing = async (listingId: string) => {
     setIsDeleting(listingId);
     try {
-      const { error } = await supabase
-        .from("listings")
-        .update({ status: "disabled" })
-        .eq("id", listingId);
+      const { error } = await supabase.from("listings").update({ status: "disabled" }).eq("id", listingId);
       if (error) throw error;
       setListings((prev) => prev.filter((l) => l.id !== listingId));
     } catch (error) {
@@ -144,14 +155,9 @@ export default function DashboardPage() {
   const handleTogglePause = async (listingId: string, currentStatus: string) => {
     const newStatus = currentStatus === "paused" ? "approved" : "paused";
     try {
-      const { error } = await supabase
-        .from("listings")
-        .update({ status: newStatus })
-        .eq("id", listingId);
+      const { error } = await supabase.from("listings").update({ status: newStatus }).eq("id", listingId);
       if (error) throw error;
-      setListings((prev) =>
-        prev.map((l) => (l.id === listingId ? { ...l, status: newStatus } : l))
-      );
+      setListings((prev) => prev.map((l) => (l.id === listingId ? { ...l, status: newStatus } : l)));
     } catch (error) {
       console.error("Error al cambiar estado:", error);
       alert("No se pudo cambiar el estado de la publicación.");
@@ -186,24 +192,51 @@ export default function DashboardPage() {
     }
   };
 
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileData.fullName.trim()) {
+      setProfileMessage({ type: "error", text: "El nombre no puede estar vacío." });
+      return;
+    }
+    // Validación básica de teléfono
+    if (profileData.phone && !/^[\d\s\+\-\(\)]{6,20}$/.test(profileData.phone)) {
+      setProfileMessage({ type: "error", text: "El teléfono ingresado no es válido." });
+      return;
+    }
+    setIsSavingProfile(true);
+    setProfileMessage({ type: "", text: "" });
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: profileData.fullName.trim(),
+          phone: profileData.phone.trim() || null,
+        })
+        .eq("id", user?.id);
+      if (error) throw error;
+      setProfileMessage({ type: "success", text: "Perfil actualizado correctamente." });
+      setIsEditingProfile(false);
+    } catch (error) {
+      console.error(error);
+      setProfileMessage({ type: "error", text: "Error al guardar los datos." });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   if (authLoading || !user || !profile) return null;
 
   const displayName = profile.full_name || user.user_metadata?.full_name || user.email;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "approved":
-      case "active":
-      case "confirmed":
+      case "approved": case "active": case "confirmed":
         return <Badge className="bg-green-600 hover:bg-green-700 text-white">Aprobado</Badge>;
-      case "pending_review":
-      case "hold":
+      case "pending_review": case "hold":
         return <Badge variant="secondary">En proceso</Badge>;
-      case "rejected":
-      case "cancelled":
+      case "rejected": case "cancelled":
         return <Badge variant="destructive">Rechazado/Cancelado</Badge>;
-      case "disabled":
-      case "suspended":
+      case "disabled": case "suspended":
         return <Badge variant="outline" className="text-muted-foreground">Deshabilitado</Badge>;
       case "paused":
         return <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">Pausada</Badge>;
@@ -216,15 +249,14 @@ export default function DashboardPage() {
     <AppShell>
       <div className="container max-w-7xl mx-auto px-4 py-8">
 
+        {/* Alerta datos de cobro */}
         {isHost && !isLoadingPayout && !hasPayoutMethod && (
           <div className="bg-destructive/10 border-l-4 border-destructive text-destructive-foreground p-4 rounded-r-lg mb-8 shadow-sm flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             <div className="flex gap-3 items-start sm:items-center">
               <AlertTriangle className="h-6 w-6 text-destructive flex-shrink-0" />
               <div>
                 <h3 className="font-bold text-destructive">¡Atención! Faltan tus datos de cobro</h3>
-                <p className="text-sm opacity-90">
-                  Para poder recibir el dinero de tus reservas, necesitás configurar tu CBU/CVU.
-                </p>
+                <p className="text-sm opacity-90">Para recibir el dinero de tus reservas, necesitás configurar tu CBU/CVU.</p>
               </div>
             </div>
             <Button variant="destructive" size="sm" className="whitespace-nowrap" onClick={() => setActiveTab("perfil")}>
@@ -239,17 +271,20 @@ export default function DashboardPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto overflow-x-auto h-auto p-1">
+          {/* ── TabsList responsive: 2 cols mobile, 4 cols desktop ── */}
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto p-1">
             {isHost && <TabsTrigger value="espacios" className="py-2">Mis espacios</TabsTrigger>}
             {isRenter && <TabsTrigger value="reservas" className="py-2">Mis reservas</TabsTrigger>}
             <TabsTrigger value="mensajes" className="py-2">Mensajes</TabsTrigger>
-            <TabsTrigger value="perfil" className="py-2">Información personal</TabsTrigger>
+            <TabsTrigger value="perfil" className="py-2">Mi perfil</TabsTrigger>
           </TabsList>
 
           {/* ── TAB: MIS ESPACIOS ── */}
           {isHost && (
             <TabsContent value="espacios" className="space-y-6">
-              {isHost && <PendingQuestionsBadge />}
+              {/* Badge preguntas pendientes */}
+              <PendingQuestionsBadge />
+
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -260,7 +295,8 @@ export default function DashboardPage() {
                     <Button asChild>
                       <Link href="/publicar">
                         <Plus className="h-4 w-4 mr-2" />
-                        Publicar nuevo espacio
+                        <span className="hidden sm:inline">Publicar nuevo espacio</span>
+                        <span className="sm:hidden">Publicar</span>
                       </Link>
                     </Button>
                   </div>
@@ -273,20 +309,16 @@ export default function DashboardPage() {
                   ) : listings.length === 0 ? (
                     <div className="text-center py-12">
                       <p className="text-muted-foreground mb-4">Todavía no tenés espacios publicados</p>
-                      <Button asChild>
-                        <Link href="/publicar">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Publicar mi primer espacio
-                        </Link>
-                      </Button>
+                      <Button asChild><Link href="/publicar"><Plus className="h-4 w-4 mr-2" />Publicar mi primer espacio</Link></Button>
                     </div>
                   ) : (
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Título y Detalles</TableHead>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead>Precio/día</TableHead>
+                          <TableHead>Espacio</TableHead>
+                          {/* Columnas ocultas en mobile */}
+                          <TableHead className="hidden sm:table-cell">Tipo</TableHead>
+                          <TableHead className="hidden sm:table-cell">Precio/día</TableHead>
                           <TableHead>Estado</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
@@ -298,9 +330,7 @@ export default function DashboardPage() {
                               <TableCell>
                                 <div className="space-y-1">
                                   <div className="font-medium text-foreground">{listing.title}</div>
-                                  {listing.doorly_certified && (
-                                    <DoorlyCertifiedBadge size="sm" />
-                                  )}
+                                  {listing.doorly_certified && <DoorlyCertifiedBadge size="sm" />}
                                   {listing.status === "rejected" && listing.rejection_reason && (
                                     <div className="mt-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-2">
                                       <strong className="block mb-0.5">Motivo del rechazo:</strong>
@@ -309,55 +339,41 @@ export default function DashboardPage() {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell>{listing.space_type}</TableCell>
-                              <TableCell>${listing.price_daily?.toLocaleString("es-AR")}</TableCell>
+                              <TableCell className="hidden sm:table-cell">{listing.space_type}</TableCell>
+                              <TableCell className="hidden sm:table-cell">${listing.price_daily?.toLocaleString("es-AR")}</TableCell>
                               <TableCell>{getStatusBadge(listing.status)}</TableCell>
                               <TableCell className="text-right">
-                                <div className="flex justify-end gap-2">
+                                <div className="flex justify-end gap-1">
                                   <Button variant="ghost" size="icon" title="Ver publicación" asChild>
-                                    <Link href={`/espacios/${listing.id}`}>
-                                      <Eye className="h-4 w-4" />
-                                    </Link>
+                                    <Link href={`/espacios/${listing.id}`}><Eye className="h-4 w-4" /></Link>
                                   </Button>
                                   <Button variant="ghost" size="icon" title="Editar publicación" asChild>
-                                    <Link href={`/publicar?edit=${listing.id}`}>
-                                      <Edit className="h-4 w-4 text-muted-foreground" />
-                                    </Link>
+                                    <Link href={`/publicar?edit=${listing.id}`}><Edit className="h-4 w-4 text-muted-foreground" /></Link>
                                   </Button>
 
                                   {(listing.status === "approved" || listing.status === "paused") && (
                                     <AlertDialog>
                                       <AlertDialogTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          title={listing.status === "paused" ? "Reactivar publicación" : "Pausar publicación"}
-                                        >
-                                          {listing.status === "paused" ? (
-                                            <span className="text-green-600" style={{ fontSize: 16 }}>▶</span>
-                                          ) : (
-                                            <span className="text-amber-500" style={{ fontSize: 16 }}>⏸</span>
-                                          )}
+                                        <Button variant="ghost" size="icon" title={listing.status === "paused" ? "Reactivar" : "Pausar"}>
+                                          {listing.status === "paused"
+                                            ? <span className="text-green-600" style={{ fontSize: 16 }}>▶</span>
+                                            : <span className="text-amber-500" style={{ fontSize: 16 }}>⏸</span>}
                                         </Button>
                                       </AlertDialogTrigger>
                                       <AlertDialogContent>
                                         <AlertDialogHeader>
-                                          <AlertDialogTitle>
-                                            {listing.status === "paused" ? "¿Reactivar publicación?" : "¿Pausar publicación?"}
-                                          </AlertDialogTitle>
+                                          <AlertDialogTitle>{listing.status === "paused" ? "¿Reactivar publicación?" : "¿Pausar publicación?"}</AlertDialogTitle>
                                           <AlertDialogDescription>
                                             {listing.status === "paused"
-                                              ? "Tu espacio vuelve a aparecer en el buscador y los usuarios podrán encontrarlo y reservarlo."
-                                              : "Tu espacio dejará de aparecer en el buscador mientras esté pausado. Las reservas ya confirmadas no se verán afectadas. Podés reactivarlo cuando quieras con un solo click."}
+                                              ? "Tu espacio vuelve a aparecer en el buscador."
+                                              : "Tu espacio dejará de aparecer en el buscador. Las reservas confirmadas no se ven afectadas."}
                                           </AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
                                           <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                           <AlertDialogAction
                                             onClick={() => handleTogglePause(listing.id, listing.status)}
-                                            className={listing.status === "paused"
-                                              ? "!bg-green-600 hover:!bg-green-700 text-white"
-                                              : "!bg-amber-500 hover:!bg-amber-600 !text-white"}
+                                            className={listing.status === "paused" ? "!bg-green-600 hover:!bg-green-700 text-white" : "!bg-amber-500 hover:!bg-amber-600 !text-white"}
                                           >
                                             {listing.status === "paused" ? "Sí, reactivar" : "Sí, pausar"}
                                           </AlertDialogAction>
@@ -379,31 +395,23 @@ export default function DashboardPage() {
                                         <>
                                           <AlertDialogHeader>
                                             <AlertDialogTitle className="flex items-center gap-2">
-                                              <AlertTriangle className="h-5 w-5 text-destructive" />
-                                              No se puede eliminar
+                                              <AlertTriangle className="h-5 w-5 text-destructive" />No se puede eliminar
                                             </AlertDialogTitle>
                                             <AlertDialogDescription className="text-foreground">
-                                              Este espacio tiene reservas activas o pendientes de pago. Por seguridad, no podés eliminarlo con compromisos vigentes.
+                                              Este espacio tiene reservas activas o pendientes de pago.
                                             </AlertDialogDescription>
                                           </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                            <AlertDialogAction>Entendido</AlertDialogAction>
-                                          </AlertDialogFooter>
+                                          <AlertDialogFooter><AlertDialogAction>Entendido</AlertDialogAction></AlertDialogFooter>
                                         </>
                                       ) : (
                                         <>
                                           <AlertDialogHeader>
                                             <AlertDialogTitle>¿Eliminar publicación?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              Esta acción quitará tu espacio del buscador de forma permanente. Los usuarios ya no podrán encontrarlo ni reservarlo.
-                                            </AlertDialogDescription>
+                                            <AlertDialogDescription>Esta acción es permanente. Los usuarios ya no podrán encontrarlo.</AlertDialogDescription>
                                           </AlertDialogHeader>
                                           <AlertDialogFooter>
                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction
-                                              onClick={() => handleDeleteListing(listing.id)}
-                                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                            >
+                                            <AlertDialogAction onClick={() => handleDeleteListing(listing.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                                               Eliminar permanentemente
                                             </AlertDialogAction>
                                           </AlertDialogFooter>
@@ -419,29 +427,21 @@ export default function DashboardPage() {
                             {listing.status === "approved" && !listing.doorly_certified && (
                               <TableRow className="bg-gradient-to-r from-primary/5 to-transparent border-none hover:bg-primary/5">
                                 <TableCell colSpan={5} className="py-3 px-4">
-                                  <div className="flex items-center justify-between gap-4">
+                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                     <div className="flex items-center gap-3">
                                       <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                                         <ShieldCheck className="h-4 w-4 text-primary" />
                                       </div>
                                       <div>
-                                        <p className="text-sm font-semibold text-foreground">
-                                          Certificá este espacio y conseguí más reservas
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                          Un Doorlier visita tu espacio, verifica que es tal cual lo publicaste y te otorga el badge oficial.
-                                        </p>
+                                        <p className="text-sm font-semibold text-foreground">Certificá este espacio y conseguí más reservas</p>
+                                        <p className="text-xs text-muted-foreground">Un Doorlier visita tu espacio y te otorga el badge oficial.</p>
                                       </div>
                                     </div>
                                     <Button
                                       size="sm"
                                       variant="outline"
                                       className="shrink-0 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground"
-                                      onClick={() => setCertificationModal({
-                                        open: true,
-                                        listingId: listing.id,
-                                        listingTitle: listing.title,
-                                      })}
+                                      onClick={() => setCertificationModal({ open: true, listingId: listing.id, listingTitle: listing.title })}
                                     >
                                       <ShieldCheck className="h-4 w-4 mr-1.5" />
                                       Solicitar certificación
@@ -484,17 +484,15 @@ export default function DashboardPage() {
                     <div className="text-center py-12">
                       <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                       <p className="text-muted-foreground mb-4">Todavía no hiciste ninguna reserva</p>
-                      <Button asChild>
-                        <Link href="/buscar">Explorar espacios</Link>
-                      </Button>
+                      <Button asChild><Link href="/buscar">Explorar espacios</Link></Button>
                     </div>
                   ) : (
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Espacio</TableHead>
-                          <TableHead>Desde</TableHead>
-                          <TableHead>Hasta</TableHead>
+                          <TableHead className="hidden sm:table-cell">Desde</TableHead>
+                          <TableHead className="hidden sm:table-cell">Hasta</TableHead>
                           <TableHead>Total</TableHead>
                           <TableHead>Estado</TableHead>
                         </TableRow>
@@ -508,16 +506,15 @@ export default function DashboardPage() {
                           const canReview =
                             booking.status === "confirmed" &&
                             booking.mp_status === "approved" &&
-                            now >= openAt &&
-                            now < closeAt &&
+                            now >= openAt && now < closeAt &&
                             !reviewedBookings.has(booking.id);
 
                           return (
                             <React.Fragment key={booking.id}>
                               <TableRow>
                                 <TableCell className="font-medium">{booking.listing?.title || "N/A"}</TableCell>
-                                <TableCell>{new Date(booking.start_date).toLocaleDateString("es-AR")}</TableCell>
-                                <TableCell>{new Date(booking.end_date).toLocaleDateString("es-AR")}</TableCell>
+                                <TableCell className="hidden sm:table-cell">{new Date(booking.start_date).toLocaleDateString("es-AR")}</TableCell>
+                                <TableCell className="hidden sm:table-cell">{new Date(booking.end_date).toLocaleDateString("es-AR")}</TableCell>
                                 <TableCell>${booking.total_price?.toLocaleString("es-AR")}</TableCell>
                                 <TableCell>{getStatusBadge(booking.status)}</TableCell>
                               </TableRow>
@@ -527,9 +524,7 @@ export default function DashboardPage() {
                                     <LeaveReview
                                       bookingId={booking.id}
                                       listingTitle={booking.listing?.title || "Espacio"}
-                                      onReviewSubmitted={() =>
-                                        setReviewedBookings((prev) => new Set([...prev, booking.id]))
-                                      }
+                                      onReviewSubmitted={() => setReviewedBookings((prev) => new Set([...prev, booking.id]))}
                                     />
                                   </TableCell>
                                 </TableRow>
@@ -561,13 +556,11 @@ export default function DashboardPage() {
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <MessageSquare className="h-12 w-12 mb-4 text-muted-foreground opacity-30" />
                     <p className="text-muted-foreground text-sm">Aún no tenés reservas para chatear.</p>
-                    <Button asChild variant="outline" className="mt-4">
-                      <Link href="/buscar">Explorar espacios</Link>
-                    </Button>
+                    <Button asChild variant="outline" className="mt-4"><Link href="/buscar">Explorar espacios</Link></Button>
                   </div>
                 ) : (
                   <div className="flex" style={{ height: "520px" }}>
-                    <div className="w-64 flex-shrink-0 border-r flex flex-col">
+                    <div className="w-56 sm:w-64 flex-shrink-0 border-r flex flex-col">
                       <div className="px-4 py-3 border-b">
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tus reservas</p>
                       </div>
@@ -580,8 +573,7 @@ export default function DashboardPage() {
                           >
                             <p className="text-sm font-medium text-foreground truncate">{b.listing?.title || "Espacio"}</p>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              {new Date(b.start_date).toLocaleDateString("es-AR")} →{" "}
-                              {new Date(b.end_date).toLocaleDateString("es-AR")}
+                              {new Date(b.start_date).toLocaleDateString("es-AR")} → {new Date(b.end_date).toLocaleDateString("es-AR")}
                             </p>
                             <div className="mt-1">{getStatusBadge(b.status)}</div>
                           </button>
@@ -596,9 +588,7 @@ export default function DashboardPage() {
                           <MessageSquare className="h-10 w-10 text-muted-foreground opacity-20" />
                           <div>
                             <p className="text-sm font-medium text-foreground">Seleccioná una reserva</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Elegí una reserva de la lista para ver la conversación
-                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">Elegí una de la lista para ver la conversación</p>
                           </div>
                         </div>
                       )}
@@ -609,96 +599,165 @@ export default function DashboardPage() {
             </Card>
           </TabsContent>
 
-          {/* ── TAB: INFORMACIÓN PERSONAL ── */}
+          {/* ── TAB: MI PERFIL ── */}
           <TabsContent value="perfil" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
 
+              {/* ── Información Personal ── */}
               <Card>
                 <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <User className="h-5 w-5 text-primary" />
-                    <CardTitle>Información Personal</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <User className="h-5 w-5 text-primary" />
+                      <CardTitle>Información Personal</CardTitle>
+                    </div>
+                    {!isEditingProfile && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-primary hover:text-primary"
+                        onClick={() => { setIsEditingProfile(true); setProfileMessage({ type: "", text: "" }); }}
+                      >
+                        <Pencil className="h-4 w-4 mr-1.5" />
+                        Editar
+                      </Button>
+                    )}
                   </div>
                   <CardDescription>Datos básicos de tu cuenta</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Nombre completo</Label>
-                    <p className="font-medium text-foreground">{profile?.full_name || "No definido"}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Email</Label>
-                    <p className="font-medium text-foreground">{user.email}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Tipo de cuenta</Label>
-                    <div>
-                      <Badge variant="secondary" className="capitalize mt-1">{profile?.role}</Badge>
+                <CardContent>
+                  {isEditingProfile ? (
+                    <form onSubmit={handleSaveProfile} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="profileName">Nombre completo</Label>
+                        <Input
+                          id="profileName"
+                          value={profileData.fullName}
+                          onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
+                          placeholder="Tu nombre completo"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="profilePhone">
+                          <span className="flex items-center gap-1.5">
+                            <Phone className="h-3.5 w-3.5" />
+                            Teléfono (opcional)
+                          </span>
+                        </Label>
+                        <Input
+                          id="profilePhone"
+                          value={profileData.phone}
+                          onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                          placeholder="Ej: +54 11 1234-5678"
+                          type="tel"
+                        />
+                        <p className="text-xs text-muted-foreground">Solo visible para vos y el equipo de Doorly.</p>
+                      </div>
+
+                      {/* Email — solo lectura */}
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Email (no editable)</Label>
+                        <p className="text-sm text-muted-foreground bg-muted/40 px-3 py-2 rounded-md border border-border">
+                          {user.email}
+                        </p>
+                      </div>
+
+                      {profileMessage.text && (
+                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${profileMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                          {profileMessage.type === "success" ? <ShieldCheck className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                          {profileMessage.text}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 pt-1">
+                        <Button type="submit" disabled={isSavingProfile} className="flex-1">
+                          {isSavingProfile ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                          Guardar cambios
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setIsEditingProfile(false);
+                            setProfileData({ fullName: profile.full_name || "", phone: profile.phone || "" });
+                            setProfileMessage({ type: "", text: "" });
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Nombre completo</Label>
+                        <p className="font-medium text-foreground">{profile?.full_name || "No definido"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Email</Label>
+                        <p className="font-medium text-foreground">{user.email}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                          <Phone className="h-3 w-3" /> Teléfono
+                        </Label>
+                        <p className="font-medium text-foreground">
+                          {profile?.phone || <span className="text-muted-foreground text-sm italic">No cargado</span>}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Tipo de cuenta</Label>
+                        <div><Badge variant="secondary" className="capitalize mt-1">{profile?.role}</Badge></div>
+                      </div>
+
+                      {profileMessage.text && (
+                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${profileMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                          {profileMessage.type === "success" ? <ShieldCheck className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                          {profileMessage.text}
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
 
+              {/* ── Datos de Cobro ── */}
               <Card className={`border-2 transition-colors ${!hasPayoutMethod && isHost ? "border-destructive/50 shadow-sm shadow-destructive/20" : "border-border"}`}>
                 <CardHeader className="bg-muted/30 border-b">
                   <div className="flex items-center gap-2">
                     <Landmark className="h-5 w-5 text-primary" />
                     <CardTitle>Datos de Cobro</CardTitle>
                   </div>
-                  <CardDescription>
-                    Configurá dónde querés recibir el dinero de tus alquileres.
-                  </CardDescription>
+                  <CardDescription>Configurá dónde querés recibir el dinero de tus alquileres.</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-6">
                   {isLoadingPayout ? (
-                    <div className="flex justify-center py-6">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    </div>
+                    <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
                   ) : (
                     <form onSubmit={handleSavePayout} className="space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="fullName">Nombre del Titular</Label>
-                        <Input
-                          id="fullName"
-                          placeholder="Tal cual figura en tu banco"
-                          value={payoutData.fullName}
-                          onChange={(e) => setPayoutData({ ...payoutData, fullName: e.target.value })}
-                          required
-                        />
+                        <Input id="fullName" placeholder="Tal cual figura en tu banco" value={payoutData.fullName}
+                          onChange={(e) => setPayoutData({ ...payoutData, fullName: e.target.value })} required />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="cuit">CUIT / CUIL</Label>
-                          <Input
-                            id="cuit"
-                            placeholder="Sin guiones"
-                            value={payoutData.cuitCuil}
-                            onChange={(e) => setPayoutData({ ...payoutData, cuitCuil: e.target.value })}
-                            required
-                          />
+                          <Input id="cuit" placeholder="Sin guiones" value={payoutData.cuitCuil}
+                            onChange={(e) => setPayoutData({ ...payoutData, cuitCuil: e.target.value })} required />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="bank">Banco / Billetera</Label>
-                          <Input
-                            id="bank"
-                            placeholder="Ej: Mercado Pago"
-                            value={payoutData.bankName}
-                            onChange={(e) => setPayoutData({ ...payoutData, bankName: e.target.value })}
-                            required
-                          />
+                          <Input id="bank" placeholder="Ej: Mercado Pago" value={payoutData.bankName}
+                            onChange={(e) => setPayoutData({ ...payoutData, bankName: e.target.value })} required />
                         </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="cbu">CBU / CVU <span className="text-destructive">*</span></Label>
-                        <Input
-                          id="cbu"
-                          placeholder="22 dígitos"
-                          maxLength={22}
-                          value={payoutData.cbuCvu}
+                        <Input id="cbu" placeholder="22 dígitos" maxLength={22} value={payoutData.cbuCvu}
                           onChange={(e) => setPayoutData({ ...payoutData, cbuCvu: e.target.value.replace(/\D/g, "") })}
-                          required
-                          className="font-mono tracking-widest"
-                        />
+                          required className="font-mono tracking-widest" />
                         <div className="flex justify-between">
                           <p className="text-[10px] text-muted-foreground">Solo números</p>
                           <p className={`text-[10px] font-medium ${payoutData.cbuCvu.length === 22 ? "text-green-600" : "text-muted-foreground"}`}>
@@ -708,25 +767,17 @@ export default function DashboardPage() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="alias">Alias (Opcional)</Label>
-                        <Input
-                          id="alias"
-                          placeholder="puerta.casa.sol"
-                          value={payoutData.alias}
-                          onChange={(e) => setPayoutData({ ...payoutData, alias: e.target.value })}
-                        />
+                        <Input id="alias" placeholder="puerta.casa.sol" value={payoutData.alias}
+                          onChange={(e) => setPayoutData({ ...payoutData, alias: e.target.value })} />
                       </div>
                       {payoutMessage.text && (
                         <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${payoutMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-                          {payoutMessage.type === "success"
-                            ? <ShieldCheck className="h-4 w-4" />
-                            : <AlertCircle className="h-4 w-4" />}
+                          {payoutMessage.type === "success" ? <ShieldCheck className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                           {payoutMessage.text}
                         </div>
                       )}
                       <Button type="submit" disabled={isSavingPayout} className="w-full mt-2">
-                        {isSavingPayout
-                          ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          : <Save className="h-4 w-4 mr-2" />}
+                        {isSavingPayout ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                         {hasPayoutMethod ? "Actualizar datos" : "Guardar datos"}
                       </Button>
                     </form>
@@ -736,7 +787,6 @@ export default function DashboardPage() {
 
             </div>
           </TabsContent>
-
         </Tabs>
       </div>
     </AppShell>

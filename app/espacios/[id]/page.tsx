@@ -51,7 +51,7 @@ export default async function EspacioDetailPage({
     .eq("listing_id", id)
     .in("status", ["hold", "confirmed", "completed"]);
 
-  if (bookingsError) console.error(">>> Error leyendo reservas:", bookingsError);
+  if (bookingsError) console.error("Error leyendo reservas:", bookingsError);
 
   const blockedDates = (bookingsData || []).map((b) => ({
     listingId: id,
@@ -95,17 +95,13 @@ export default async function EspacioDetailPage({
   return (
     <AppShell>
       <div className="min-h-screen bg-background">
-        <div className="container max-w-7xl mx-auto px-4 py-8">
+        <div className="container max-w-7xl mx-auto px-4 py-6 md:py-8">
 
-          {/* ══ BLOQUE SUPERIOR: foto izquierda + widget derecha ══ */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 380px",
-              gap: "2.5rem",
-              alignItems: "start",
-            }}
-          >
+          {/* ══ BLOQUE SUPERIOR: foto izquierda + widget derecha ══
+              En mobile: columna única (widget debajo)
+              En desktop (lg): dos columnas lado a lado            */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 lg:gap-10 items-start">
+
             {/* ── IZQUIERDA: badges + título + carrusel ── */}
             <div className="space-y-4 min-w-0">
               <div>
@@ -122,11 +118,11 @@ export default async function EspacioDetailPage({
                   {listing.doorly_certified && <DoorlyCertifiedBadge size="md" />}
                 </div>
 
-                <h1 className="text-2xl font-bold text-foreground leading-tight mb-2">
+                <h1 className="text-xl md:text-2xl font-bold text-foreground leading-tight mb-2">
                   {listing.title}
                 </h1>
 
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3 md:gap-4">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <MapPin className="h-4 w-4 text-primary" />
                     <span className="text-sm">{listing.areaLabel}</span>
@@ -148,14 +144,16 @@ export default async function EspacioDetailPage({
               <PhotoCarousel photos={photos} title={listing.title} />
             </div>
 
-            {/* ── DERECHA: widget sticky ── */}
-            <div style={{ position: "sticky", top: "6rem" }}>
+            {/* ── DERECHA: widget ──
+                En mobile aparece debajo del carrusel (orden natural)
+                En desktop es sticky al lado                          */}
+            <div className="lg:sticky lg:top-24">
               <BookingWidget listing={listing} blockedDates={blockedDates} />
             </div>
           </div>
 
-          {/* ══ BLOQUE INFERIOR: detalles ══ */}
-          <div className="max-w-3xl mt-10 space-y-8">
+          {/* ══ BLOQUE INFERIOR: detalles completos ══ */}
+          <div className="max-w-3xl mt-8 md:mt-10 space-y-8">
 
             {/* Descripción */}
             <div className="pb-8 border-b border-border">
@@ -193,7 +191,7 @@ export default async function EspacioDetailPage({
                   <ShieldCheck className="h-5 w-5 text-primary" />
                   <h3 className="font-bold text-foreground text-lg">Atributos y seguridad</h3>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {listing.rulesAllowed.map((rule: string) => (
                     <div key={rule} className="flex items-center gap-2.5 p-3 rounded-xl bg-green-50 border border-green-100">
                       <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
@@ -204,8 +202,7 @@ export default async function EspacioDetailPage({
               </div>
             )}
 
-            {/* ── TABS: Detalles / Condiciones / Reseñas ── */}
-            {/* ⚠️ El mapa está FUERA de los tabs para que Mapbox se inicialice correctamente */}
+            {/* ── TABS: 3 tabs (sin mapa) ── */}
             <Tabs defaultValue="detalles" className="w-full">
               <TabsList className="w-full grid grid-cols-3 h-auto bg-muted/40 p-1 rounded-xl border border-border mb-6">
                 {["detalles", "condiciones", "resenas"].map((tab) => (
@@ -224,7 +221,7 @@ export default async function EspacioDetailPage({
 
               {/* TAB: DETALLES */}
               <TabsContent value="detalles" className="space-y-6">
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                   <Card className="shadow-none border-border">
                     <CardContent className="p-5">
                       <div className="flex items-center gap-2 mb-2">
@@ -258,7 +255,7 @@ export default async function EspacioDetailPage({
                 {listing.amenities.length > 0 && (
                   <div>
                     <h3 className="font-semibold text-foreground mb-3">Comodidades adicionales</h3>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
                       {listing.amenities.map((amenity: string) => (
                         <div key={amenity} className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-primary" />
@@ -282,7 +279,7 @@ export default async function EspacioDetailPage({
                 {listing.rulesNotAllowed.length > 0 ? (
                   <div>
                     <h3 className="font-bold text-foreground mb-4">Restricciones del propietario</h3>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
                       {listing.rulesNotAllowed.map((rule: string) => (
                         <div key={rule} className="flex items-start gap-2 bg-red-50 p-3 rounded-xl border border-red-100">
                           <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
@@ -304,12 +301,9 @@ export default async function EspacioDetailPage({
               </TabsContent>
             </Tabs>
 
-            {/* ══ MAPA: fuera de tabs, siempre visible en el DOM ══ */}
-            <div className="pt-2" id="ubicacion">
+            {/* ══ MAPA: siempre visible, FUERA de tabs ══ */}
+            <div className="border-t border-border pt-8">
               <Card className="overflow-hidden border-border shadow-none">
-                <div className="pt-2">
-  <ListingQuestions listingId={id} hostId={rawListing.host_id} />
-</div>
                 <CardHeader className="bg-muted/30 border-b py-3 px-5">
                   <CardTitle className="text-base flex items-center gap-2">
                     <MapPin className="h-4 w-4 text-primary" />
@@ -342,6 +336,11 @@ export default async function EspacioDetailPage({
                   )}
                 </CardContent>
               </Card>
+            </div>
+
+            {/* ══ PREGUNTAS ══ */}
+            <div className="border-t border-border pt-8">
+              <ListingQuestions listingId={id} hostId={rawListing.host_id} />
             </div>
 
           </div>
