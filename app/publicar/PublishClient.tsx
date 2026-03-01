@@ -69,7 +69,7 @@ const SPACE_ATTRIBUTES = [
 // Regex para detectar teléfonos y mails en la descripción
 const PHONE_REGEX = /(\+?54\s?)?(\d[\s\-.]?){8,12}\d/g;
 const EMAIL_REGEX = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
-const photoInputRef = useRef<HTMLInputElement>(null);
+
 // ─── TIPOS LOCALES ──────────────────────────────────────────────────────────────
 
 interface FormData {
@@ -160,7 +160,9 @@ function PublishFormContent() {
     priceWeekly: undefined,
     priceMonthly: undefined,
     photos: [],
+    const photoInputRef = useRef<HTMLInputElement>(null);
   });
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [blockedDates, setBlockedDates] = useState<{ start: Date; end: Date; reason: string }[]>([]);
   const [newBlockStart, setNewBlockStart] = useState<Date>();
