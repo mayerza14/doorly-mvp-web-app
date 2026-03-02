@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
@@ -30,6 +30,83 @@ import { CertificationRequestModal } from "@/components/certification-request-mo
 import { DoorlyCertifiedBadge } from "@/components/doorly-certified-badge";
 import { PendingQuestionsBadge } from "@/components/pending-questions-badge";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PaymentVerifier: componente separado para poder usar useSearchParams
+// dentro de un Suspense boundary (requerido por Next.js App Router)
+// ─────────────────────────────────────────────────────────────────────────────
+type VerificationStatus = "loading" | "confirmed" | "pending" | "error";
+
+interface PaymentVerifierProps {
+  user: any;
+  onResult: (status: VerificationStatus, message: string) => void;
+}
+
+function PaymentVerifier({ user, onResult }: PaymentVerifierProps) {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const pago = searchParams.get("pago");
+    if (!pago || !user) return;
+
+    if (pago === "error") {
+      onResult("error", "El pago no se completó. Podés intentarlo de nuevo.");
+      return;
+    }
+
+    if (pago === "pendiente") {
+      onResult("pending", "Tu pago está siendo procesado. Te avisaremos cuando se confirme.");
+      return;
+    }
+
+    if (pago === "ok") {
+      onResult("loading", "Verificando tu pago...");
+
+      (async () => {
+        try {
+          // Buscamos el booking más reciente con mp_status created o approved
+          const { data: latestBooking } = await supabase
+            .from("bookings")
+            .select("id")
+            .eq("renter_id", user.id)
+            .in("mp_status", ["created", "approved"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (!latestBooking?.id) {
+            onResult("error", "No encontramos tu reserva. Contactanos si el problema persiste.");
+            return;
+          }
+
+          const { data, error } = await supabase.functions.invoke("verify-payment", {
+            body: { booking_id: latestBooking.id },
+          });
+
+          if (error || !data) {
+            onResult("error", "No pudimos verificar el pago. Revisá el estado de tu reserva abajo.");
+            return;
+          }
+
+          if (data.status === "confirmed") {
+            onResult("confirmed", "¡Tu reserva está confirmada! 🎉");
+          } else if (data.status === "pending") {
+            onResult("pending", "Tu pago está siendo procesado. Actualizá la página en unos minutos.");
+          } else {
+            onResult("error", "El pago no pudo confirmarse. Si se acreditó, contactanos.");
+          }
+        } catch {
+          onResult("error", "Error al verificar. Revisá tu reserva abajo.");
+        }
+      })();
+    }
+  }, [searchParams, user]);
+
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DashboardPage
+// ─────────────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const router = useRouter();
   const { user, profile, isLoading: authLoading } = useAuth();
@@ -45,6 +122,13 @@ export default function DashboardPage() {
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  // Estado de verificación de pago
+  const [paymentVerification, setPaymentVerification] = useState<{
+    status: VerificationStatus | null;
+    message: string;
+  }>({ status: null, message: "" });
+
   const [certificationModal, setCertificationModal] = useState<{
     open: boolean; listingId: string; listingTitle: string;
   }>({ open: false, listingId: "", listingTitle: "" });
@@ -67,6 +151,7 @@ export default function DashboardPage() {
     phone: "",
   });
 
+  // Redirigir si no hay sesión
   useEffect(() => {
     if (!authLoading && !user) router.push("/auth?returnUrl=/dashboard");
   }, [user, authLoading, router]);
@@ -80,6 +165,7 @@ export default function DashboardPage() {
     });
   }, [user, profile]);
 
+  // Cargar datos de cobro
   useEffect(() => {
     if (!user) return;
     const fetchPayoutData = async () => {
@@ -105,6 +191,7 @@ export default function DashboardPage() {
     fetchPayoutData();
   }, [user]);
 
+  // Cargar publicaciones
   const fetchListings = async () => {
     if (!user) return;
     const { data, error } = await supabase
@@ -127,16 +214,28 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchListings(); }, [user]);
 
-  useEffect(() => {
+  // Cargar reservas
+  const fetchBookings = async () => {
     if (!user) return;
-    const fetchBookings = async () => {
-      const { data, error } = await supabase.functions.invoke("my-bookings", { method: "GET" });
-      if (!error && data?.bookings) setBookings(data.bookings);
-      else if (error) console.error("Error fetching bookings:", error);
-      setIsLoadingBookings(false);
-    };
-    fetchBookings();
-  }, [user]);
+    const { data, error } = await supabase.functions.invoke("my-bookings", { method: "GET" });
+    if (!error && data?.bookings) setBookings(data.bookings);
+    else if (error) console.error("Error fetching bookings:", error);
+    setIsLoadingBookings(false);
+  };
+
+  useEffect(() => { fetchBookings(); }, [user]);
+
+  // Cuando el pago se confirma: recargar reservas y navegar al tab correcto
+  useEffect(() => {
+    if (paymentVerification.status === "confirmed" || paymentVerification.status === "loading") {
+      setActiveTab("reservas");
+    }
+    if (paymentVerification.status === "confirmed") {
+      fetchBookings();
+    }
+  }, [paymentVerification.status]);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleDeleteListing = async (listingId: string) => {
     setIsDeleting(listingId);
@@ -198,7 +297,6 @@ export default function DashboardPage() {
       setProfileMessage({ type: "error", text: "El nombre no puede estar vacío." });
       return;
     }
-    // Validación básica de teléfono
     if (profileData.phone && !/^[\d\s\+\-\(\)]{6,20}$/.test(profileData.phone)) {
       setProfileMessage({ type: "error", text: "El teléfono ingresado no es válido." });
       return;
@@ -224,30 +322,78 @@ export default function DashboardPage() {
     }
   };
 
+  // ── Guard de carga ─────────────────────────────────────────────────────────
+
   if (authLoading || !user || !profile) return null;
 
   const displayName = profile.full_name || user.user_metadata?.full_name || user.email;
 
+  // ── Helpers de UI ──────────────────────────────────────────────────────────
+
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "approved": case "active": case "confirmed":
-        return <Badge className="bg-green-600 hover:bg-green-700 text-white">Aprobado</Badge>;
-      case "pending_review": case "hold":
+      case "approved":
+      case "active":
+      case "confirmed":
+        return <Badge className="bg-green-600 hover:bg-green-700 text-white">Confirmada</Badge>;
+      case "pending_review":
+      case "hold":
         return <Badge variant="secondary">En proceso</Badge>;
-      case "rejected": case "cancelled":
-        return <Badge variant="destructive">Rechazado/Cancelado</Badge>;
-      case "disabled": case "suspended":
+      case "rejected":
+      case "cancelled":
+        return <Badge variant="destructive">Cancelada</Badge>;
+      case "disabled":
+      case "suspended":
         return <Badge variant="outline" className="text-muted-foreground">Deshabilitado</Badge>;
       case "paused":
         return <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">Pausada</Badge>;
+      case "expired":
+        return <Badge variant="outline" className="text-muted-foreground">Expirada</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <AppShell>
       <div className="container max-w-7xl mx-auto px-4 py-8">
+
+        {/* Verificador de pago — separado en Suspense para cumplir con Next.js App Router */}
+        <Suspense fallback={null}>
+          <PaymentVerifier
+            user={user}
+            onResult={(status, message) => setPaymentVerification({ status, message })}
+          />
+        </Suspense>
+
+        {/* Banner de resultado del pago */}
+        {paymentVerification.status && (
+          <div className={`p-4 rounded-lg mb-4 flex items-center gap-3 ${
+            paymentVerification.status === "confirmed"
+              ? "bg-green-50 border border-green-200 text-green-800"
+              : paymentVerification.status === "pending"
+              ? "bg-yellow-50 border border-yellow-200 text-yellow-800"
+              : paymentVerification.status === "loading"
+              ? "bg-blue-50 border border-blue-200 text-blue-800"
+              : "bg-red-50 border border-red-200 text-red-800"
+          }`}>
+            {paymentVerification.status === "loading" && (
+              <Loader2 className="h-5 w-5 animate-spin shrink-0" />
+            )}
+            {paymentVerification.status === "confirmed" && (
+              <ShieldCheck className="h-5 w-5 shrink-0" />
+            )}
+            {paymentVerification.status === "error" && (
+              <AlertCircle className="h-5 w-5 shrink-0" />
+            )}
+            {paymentVerification.status === "pending" && (
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+            )}
+            <p className="text-sm font-medium">{paymentVerification.message}</p>
+          </div>
+        )}
 
         {/* Alerta datos de cobro */}
         {isHost && !isLoadingPayout && !hasPayoutMethod && (
@@ -271,7 +417,6 @@ export default function DashboardPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          {/* ── TabsList responsive: 2 cols mobile, 4 cols desktop ── */}
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto p-1">
             {isHost && <TabsTrigger value="espacios" className="py-2">Mis espacios</TabsTrigger>}
             {isRenter && <TabsTrigger value="reservas" className="py-2">Mis reservas</TabsTrigger>}
@@ -282,9 +427,7 @@ export default function DashboardPage() {
           {/* ── TAB: MIS ESPACIOS ── */}
           {isHost && (
             <TabsContent value="espacios" className="space-y-6">
-              {/* Badge preguntas pendientes */}
               <PendingQuestionsBadge />
-
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -309,14 +452,15 @@ export default function DashboardPage() {
                   ) : listings.length === 0 ? (
                     <div className="text-center py-12">
                       <p className="text-muted-foreground mb-4">Todavía no tenés espacios publicados</p>
-                      <Button asChild><Link href="/publicar"><Plus className="h-4 w-4 mr-2" />Publicar mi primer espacio</Link></Button>
+                      <Button asChild>
+                        <Link href="/publicar"><Plus className="h-4 w-4 mr-2" />Publicar mi primer espacio</Link>
+                      </Button>
                     </div>
                   ) : (
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Espacio</TableHead>
-                          {/* Columnas ocultas en mobile */}
                           <TableHead className="hidden sm:table-cell">Tipo</TableHead>
                           <TableHead className="hidden sm:table-cell">Precio/día</TableHead>
                           <TableHead>Estado</TableHead>
@@ -362,7 +506,9 @@ export default function DashboardPage() {
                                       </AlertDialogTrigger>
                                       <AlertDialogContent>
                                         <AlertDialogHeader>
-                                          <AlertDialogTitle>{listing.status === "paused" ? "¿Reactivar publicación?" : "¿Pausar publicación?"}</AlertDialogTitle>
+                                          <AlertDialogTitle>
+                                            {listing.status === "paused" ? "¿Reactivar publicación?" : "¿Pausar publicación?"}
+                                          </AlertDialogTitle>
                                           <AlertDialogDescription>
                                             {listing.status === "paused"
                                               ? "Tu espacio vuelve a aparecer en el buscador."
@@ -373,7 +519,9 @@ export default function DashboardPage() {
                                           <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                           <AlertDialogAction
                                             onClick={() => handleTogglePause(listing.id, listing.status)}
-                                            className={listing.status === "paused" ? "!bg-green-600 hover:!bg-green-700 text-white" : "!bg-amber-500 hover:!bg-amber-600 !text-white"}
+                                            className={listing.status === "paused"
+                                              ? "!bg-green-600 hover:!bg-green-700 text-white"
+                                              : "!bg-amber-500 hover:!bg-amber-600 !text-white"}
                                           >
                                             {listing.status === "paused" ? "Sí, reactivar" : "Sí, pausar"}
                                           </AlertDialogAction>
@@ -407,11 +555,16 @@ export default function DashboardPage() {
                                         <>
                                           <AlertDialogHeader>
                                             <AlertDialogTitle>¿Eliminar publicación?</AlertDialogTitle>
-                                            <AlertDialogDescription>Esta acción es permanente. Los usuarios ya no podrán encontrarlo.</AlertDialogDescription>
+                                            <AlertDialogDescription>
+                                              Esta acción es permanente. Los usuarios ya no podrán encontrarlo.
+                                            </AlertDialogDescription>
                                           </AlertDialogHeader>
                                           <AlertDialogFooter>
                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDeleteListing(listing.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                            <AlertDialogAction
+                                              onClick={() => handleDeleteListing(listing.id)}
+                                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                            >
                                               Eliminar permanentemente
                                             </AlertDialogAction>
                                           </AlertDialogFooter>
@@ -506,16 +659,23 @@ export default function DashboardPage() {
                           const canReview =
                             booking.status === "confirmed" &&
                             booking.mp_status === "approved" &&
-                            now >= openAt && now < closeAt &&
+                            now >= openAt &&
+                            now < closeAt &&
                             !reviewedBookings.has(booking.id);
 
                           return (
                             <React.Fragment key={booking.id}>
                               <TableRow>
                                 <TableCell className="font-medium">{booking.listing?.title || "N/A"}</TableCell>
-                                <TableCell className="hidden sm:table-cell">{new Date(booking.start_date).toLocaleDateString("es-AR")}</TableCell>
-                                <TableCell className="hidden sm:table-cell">{new Date(booking.end_date).toLocaleDateString("es-AR")}</TableCell>
-                                <TableCell>${booking.total_price?.toLocaleString("es-AR")}</TableCell>
+                                <TableCell className="hidden sm:table-cell">
+                                  {new Date(booking.start_date).toLocaleDateString("es-AR")}
+                                </TableCell>
+                                <TableCell className="hidden sm:table-cell">
+                                  {new Date(booking.end_date).toLocaleDateString("es-AR")}
+                                </TableCell>
+                                <TableCell>
+                                  ${(booking.total_amount ?? booking.total_price)?.toLocaleString("es-AR") ?? "-"}
+                                </TableCell>
                                 <TableCell>{getStatusBadge(booking.status)}</TableCell>
                               </TableRow>
                               {canReview && (
@@ -524,7 +684,9 @@ export default function DashboardPage() {
                                     <LeaveReview
                                       bookingId={booking.id}
                                       listingTitle={booking.listing?.title || "Espacio"}
-                                      onReviewSubmitted={() => setReviewedBookings((prev) => new Set([...prev, booking.id]))}
+                                      onReviewSubmitted={() =>
+                                        setReviewedBookings((prev) => new Set([...prev, booking.id]))
+                                      }
                                     />
                                   </TableCell>
                                 </TableRow>
@@ -556,7 +718,9 @@ export default function DashboardPage() {
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <MessageSquare className="h-12 w-12 mb-4 text-muted-foreground opacity-30" />
                     <p className="text-muted-foreground text-sm">Aún no tenés reservas para chatear.</p>
-                    <Button asChild variant="outline" className="mt-4"><Link href="/buscar">Explorar espacios</Link></Button>
+                    <Button asChild variant="outline" className="mt-4">
+                      <Link href="/buscar">Explorar espacios</Link>
+                    </Button>
                   </div>
                 ) : (
                   <div className="flex" style={{ height: "520px" }}>
@@ -569,11 +733,14 @@ export default function DashboardPage() {
                           <button
                             key={b.id}
                             onClick={() => setSelectedBookingId(b.id)}
-                            className={`w-full text-left px-4 py-3 transition-colors hover:bg-muted/50 border-b border-border/50 last:border-0 ${selectedBookingId === b.id ? "bg-muted" : ""}`}
+                            className={`w-full text-left px-4 py-3 transition-colors hover:bg-muted/50 border-b border-border/50 last:border-0 ${
+                              selectedBookingId === b.id ? "bg-muted" : ""
+                            }`}
                           >
                             <p className="text-sm font-medium text-foreground truncate">{b.listing?.title || "Espacio"}</p>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              {new Date(b.start_date).toLocaleDateString("es-AR")} → {new Date(b.end_date).toLocaleDateString("es-AR")}
+                              {new Date(b.start_date).toLocaleDateString("es-AR")} →{" "}
+                              {new Date(b.end_date).toLocaleDateString("es-AR")}
                             </p>
                             <div className="mt-1">{getStatusBadge(b.status)}</div>
                           </button>
@@ -603,7 +770,7 @@ export default function DashboardPage() {
           <TabsContent value="perfil" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
 
-              {/* ── Información Personal ── */}
+              {/* Información Personal */}
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -654,25 +821,27 @@ export default function DashboardPage() {
                         />
                         <p className="text-xs text-muted-foreground">Solo visible para vos y el equipo de Doorly.</p>
                       </div>
-
-                      {/* Email — solo lectura */}
                       <div className="space-y-1">
                         <Label className="text-muted-foreground text-xs">Email (no editable)</Label>
                         <p className="text-sm text-muted-foreground bg-muted/40 px-3 py-2 rounded-md border border-border">
                           {user.email}
                         </p>
                       </div>
-
                       {profileMessage.text && (
-                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${profileMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-                          {profileMessage.type === "success" ? <ShieldCheck className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${
+                          profileMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                        }`}>
+                          {profileMessage.type === "success"
+                            ? <ShieldCheck className="h-4 w-4" />
+                            : <AlertCircle className="h-4 w-4" />}
                           {profileMessage.text}
                         </div>
                       )}
-
                       <div className="flex gap-2 pt-1">
                         <Button type="submit" disabled={isSavingProfile} className="flex-1">
-                          {isSavingProfile ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                          {isSavingProfile
+                            ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            : <Save className="h-4 w-4 mr-2" />}
                           Guardar cambios
                         </Button>
                         <Button
@@ -703,17 +872,22 @@ export default function DashboardPage() {
                           <Phone className="h-3 w-3" /> Teléfono
                         </Label>
                         <p className="font-medium text-foreground">
-                          {profile?.phone || <span className="text-muted-foreground text-sm italic">No cargado</span>}
+                          {profile?.phone || (
+                            <span className="text-muted-foreground text-sm italic">No cargado</span>
+                          )}
                         </p>
                       </div>
                       <div className="space-y-1">
                         <Label className="text-muted-foreground text-xs">Tipo de cuenta</Label>
                         <div><Badge variant="secondary" className="capitalize mt-1">{profile?.role}</Badge></div>
                       </div>
-
                       {profileMessage.text && (
-                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${profileMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-                          {profileMessage.type === "success" ? <ShieldCheck className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${
+                          profileMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                        }`}>
+                          {profileMessage.type === "success"
+                            ? <ShieldCheck className="h-4 w-4" />
+                            : <AlertCircle className="h-4 w-4" />}
                           {profileMessage.text}
                         </div>
                       )}
@@ -722,8 +896,10 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* ── Datos de Cobro ── */}
-              <Card className={`border-2 transition-colors ${!hasPayoutMethod && isHost ? "border-destructive/50 shadow-sm shadow-destructive/20" : "border-border"}`}>
+              {/* Datos de Cobro */}
+              <Card className={`border-2 transition-colors ${
+                !hasPayoutMethod && isHost ? "border-destructive/50 shadow-sm shadow-destructive/20" : "border-border"
+              }`}>
                 <CardHeader className="bg-muted/30 border-b">
                   <div className="flex items-center gap-2">
                     <Landmark className="h-5 w-5 text-primary" />
@@ -733,51 +909,86 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent className="pt-6">
                   {isLoadingPayout ? (
-                    <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                    <div className="flex justify-center py-6">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
                   ) : (
                     <form onSubmit={handleSavePayout} className="space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="fullName">Nombre del Titular</Label>
-                        <Input id="fullName" placeholder="Tal cual figura en tu banco" value={payoutData.fullName}
-                          onChange={(e) => setPayoutData({ ...payoutData, fullName: e.target.value })} required />
+                        <Input
+                          id="fullName"
+                          placeholder="Tal cual figura en tu banco"
+                          value={payoutData.fullName}
+                          onChange={(e) => setPayoutData({ ...payoutData, fullName: e.target.value })}
+                          required
+                        />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="cuit">CUIT / CUIL</Label>
-                          <Input id="cuit" placeholder="Sin guiones" value={payoutData.cuitCuil}
-                            onChange={(e) => setPayoutData({ ...payoutData, cuitCuil: e.target.value })} required />
+                          <Input
+                            id="cuit"
+                            placeholder="Sin guiones"
+                            value={payoutData.cuitCuil}
+                            onChange={(e) => setPayoutData({ ...payoutData, cuitCuil: e.target.value })}
+                            required
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="bank">Banco / Billetera</Label>
-                          <Input id="bank" placeholder="Ej: Mercado Pago" value={payoutData.bankName}
-                            onChange={(e) => setPayoutData({ ...payoutData, bankName: e.target.value })} required />
+                          <Input
+                            id="bank"
+                            placeholder="Ej: Mercado Pago"
+                            value={payoutData.bankName}
+                            onChange={(e) => setPayoutData({ ...payoutData, bankName: e.target.value })}
+                            required
+                          />
                         </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="cbu">CBU / CVU <span className="text-destructive">*</span></Label>
-                        <Input id="cbu" placeholder="22 dígitos" maxLength={22} value={payoutData.cbuCvu}
+                        <Input
+                          id="cbu"
+                          placeholder="22 dígitos"
+                          maxLength={22}
+                          value={payoutData.cbuCvu}
                           onChange={(e) => setPayoutData({ ...payoutData, cbuCvu: e.target.value.replace(/\D/g, "") })}
-                          required className="font-mono tracking-widest" />
+                          required
+                          className="font-mono tracking-widest"
+                        />
                         <div className="flex justify-between">
                           <p className="text-[10px] text-muted-foreground">Solo números</p>
-                          <p className={`text-[10px] font-medium ${payoutData.cbuCvu.length === 22 ? "text-green-600" : "text-muted-foreground"}`}>
+                          <p className={`text-[10px] font-medium ${
+                            payoutData.cbuCvu.length === 22 ? "text-green-600" : "text-muted-foreground"
+                          }`}>
                             {payoutData.cbuCvu.length}/22
                           </p>
                         </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="alias">Alias (Opcional)</Label>
-                        <Input id="alias" placeholder="puerta.casa.sol" value={payoutData.alias}
-                          onChange={(e) => setPayoutData({ ...payoutData, alias: e.target.value })} />
+                        <Input
+                          id="alias"
+                          placeholder="puerta.casa.sol"
+                          value={payoutData.alias}
+                          onChange={(e) => setPayoutData({ ...payoutData, alias: e.target.value })}
+                        />
                       </div>
                       {payoutMessage.text && (
-                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${payoutMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-                          {payoutMessage.type === "success" ? <ShieldCheck className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${
+                          payoutMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                        }`}>
+                          {payoutMessage.type === "success"
+                            ? <ShieldCheck className="h-4 w-4" />
+                            : <AlertCircle className="h-4 w-4" />}
                           {payoutMessage.text}
                         </div>
                       )}
                       <Button type="submit" disabled={isSavingPayout} className="w-full mt-2">
-                        {isSavingPayout ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                        {isSavingPayout
+                          ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          : <Save className="h-4 w-4 mr-2" />}
                         {hasPayoutMethod ? "Actualizar datos" : "Guardar datos"}
                       </Button>
                     </form>

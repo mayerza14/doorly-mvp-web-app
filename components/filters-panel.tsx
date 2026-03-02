@@ -88,9 +88,12 @@ export function FiltersPanel({
             <SelectContent>
               <SelectItem value="todos">Todos</SelectItem>
               <SelectItem value="cochera">Cochera</SelectItem>
-              <SelectItem value="baulera">Baulera</SelectItem>
-              <SelectItem value="deposito">Depósito</SelectItem>
               <SelectItem value="garage">Garage</SelectItem>
+              <SelectItem value="deposito">Depósito</SelectItem>
+              <SelectItem value="baulera">Baulera</SelectItem>
+              <SelectItem value="galpon">Galpón</SelectItem>
+              <SelectItem value="espacio al aire libre">Espacio al aire libre</SelectItem>
+              <SelectItem value="otro">Otro</SelectItem>
             </SelectContent>
           </Select>
         </div>
