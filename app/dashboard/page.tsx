@@ -397,7 +397,7 @@ export default function DashboardPage() {
 
         {/* Alerta datos de cobro */}
         {isHost && !isLoadingPayout && !hasPayoutMethod && (
-          <div className="bg-destructive/10 border-l-4 border-destructive text-destructive-foreground p-4 rounded-r-lg mb-8 shadow-sm flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="bg-destructive/10 border-l-4 border-destructive text-destructive p-4 rounded-r-lg mb-8 shadow-sm flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             <div className="flex gap-3 items-start sm:items-center">
               <AlertTriangle className="h-6 w-6 text-destructive flex-shrink-0" />
               <div>

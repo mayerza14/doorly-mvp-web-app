@@ -11,17 +11,27 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import type { Listing, AvailabilityBlock } from "@/lib/types";
 import { type DateRange } from "react-day-picker";
-import { CalendarIcon, Loader2, Info } from "lucide-react";
+import { CalendarIcon, Loader2, Info, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  DOORLY_COMMISSION_ENABLED,
+  calcRenterCommission,
+  calcRenterTotal,
+} from "@/lib/commission";
 
 interface BookingWidgetProps {
   listing: Listing;
   blockedDates: AvailabilityBlock[];
+  hostHasPayoutMethod: boolean;
 }
 
-export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
+export function BookingWidget({
+  listing,
+  blockedDates,
+  hostHasPayoutMethod,
+}: BookingWidgetProps) {
   const router = useRouter();
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [isReserving, setIsReserving] = useState(false);
@@ -41,11 +51,12 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
   const calculatePrice = () => {
     if (!dateRange?.from || !dateRange?.to) return null;
 
-    const days = Math.ceil(
-      (dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)
-    ) + 1;
+    const days =
+      Math.ceil(
+        (dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)
+      ) + 1;
 
-    let total = 0;
+    let basePrice = 0;
     let breakdown = "";
     let rateType = "";
 
@@ -53,29 +64,33 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
       const months = Math.floor(days / 30);
       const remainingDays = days % 30;
       const weeklyRate = listing.priceWeekly || listing.priceDaily * 7;
-      total =
+      basePrice =
         months * listing.priceMonthly +
         (remainingDays >= 7 && listing.priceWeekly
-          ? Math.floor(remainingDays / 7) * weeklyRate + (remainingDays % 7) * listing.priceDaily
+          ? Math.floor(remainingDays / 7) * weeklyRate +
+            (remainingDays % 7) * listing.priceDaily
           : remainingDays * listing.priceDaily);
       breakdown = `${months} mes(es)`;
       rateType = "mensual";
     } else if (days >= 7 && listing.priceWeekly) {
       const weeks = Math.floor(days / 7);
       const remainingDays = days % 7;
-      total = weeks * listing.priceWeekly + remainingDays * listing.priceDaily;
+      basePrice = weeks * listing.priceWeekly + remainingDays * listing.priceDaily;
       breakdown = `${weeks} semana(s)`;
       rateType = "semanal";
     } else {
-      total = days * listing.priceDaily;
+      basePrice = days * listing.priceDaily;
       breakdown = `${days} día(s)`;
       rateType = "diario";
     }
 
-    const serviceFeeRate = 0.10;
-    const serviceFeeAmount = Math.round(total * serviceFeeRate);
+    // Comisión al inquilino (0 si DOORLY_COMMISSION_ENABLED = false)
+    const renterCommission = calcRenterCommission(basePrice);
 
-    return { days, total, breakdown, rateType, serviceFeeAmount };
+    // Total que paga el inquilino en MP
+    const renterTotal = calcRenterTotal(basePrice);
+
+    return { days, basePrice, breakdown, rateType, renterCommission, renterTotal };
   };
 
   const priceInfo = calculatePrice();
@@ -87,26 +102,38 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
     setIsReserving(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         router.push(`/auth?returnUrl=/espacios/${listing.id}`);
         return;
       }
 
-      const { data: holdData, error: holdError } = await supabase.functions.invoke("create-hold", {
-        body: {
-          listing_id: listing.id,
-          start_date: format(dateRange.from, "yyyy-MM-dd"),
-          end_date: format(dateRange.to, "yyyy-MM-dd"),
-          amount: priceInfo.total,
-        },
-      });
+      // amount = precio base (lo que le corresponde al host antes de su comisión)
+      // total_amount = lo que paga el inquilino en MP (base + comisión inquilino)
+      const { data: holdData, error: holdError } = await supabase.functions.invoke(
+        "create-hold",
+        {
+          body: {
+            listing_id: listing.id,
+            start_date: format(dateRange.from, "yyyy-MM-dd"),
+            end_date: format(dateRange.to, "yyyy-MM-dd"),
+            amount: priceInfo.basePrice,
+            total_amount: priceInfo.renterTotal,
+          },
+        }
+      );
 
       if (holdError) {
         let mensajeReal = holdError.message;
         if (holdError.context && typeof holdError.context.json === "function") {
           const errorBody = await holdError.context.json().catch(() => ({}));
-          mensajeReal = errorBody.error || errorBody.details || JSON.stringify(errorBody) || mensajeReal;
+          mensajeReal =
+            errorBody.error ||
+            errorBody.details ||
+            JSON.stringify(errorBody) ||
+            mensajeReal;
         }
         alert("No se pudo iniciar la reserva: " + mensajeReal);
         setIsReserving(false);
@@ -116,16 +143,19 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
       const bookingId = holdData?.booking_id || holdData?.id;
       if (!bookingId) throw new Error("No se pudo obtener el ID de la reserva.");
 
-      const { data: mpData, error: mpError } = await supabase.functions.invoke("mp-create-preference", {
-        body: { booking_id: bookingId },
-      });
+      const { data: mpData, error: mpError } = await supabase.functions.invoke(
+        "mp-create-preference",
+        { body: { booking_id: bookingId } }
+      );
 
       if (mpError) {
         if (mpError.context && typeof mpError.context.json === "function") {
           const errorBody = await mpError.context.json().catch(() => ({}));
           console.error("ERROR COMPLETO DE MP:", errorBody);
         }
-        alert("Mercado Pago no pudo procesar la solicitud en este momento. Intentá de nuevo más tarde.");
+        alert(
+          "Mercado Pago no pudo procesar la solicitud en este momento. Intentá de nuevo más tarde."
+        );
         setIsReserving(false);
         return;
       }
@@ -147,7 +177,9 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
     <Card className="shadow-lg border-primary/10">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold">${listing.priceDaily.toLocaleString()}</span>
+          <span className="text-2xl font-bold">
+            ${listing.priceDaily.toLocaleString()}
+          </span>
           <span className="text-base font-normal text-muted-foreground">/ día</span>
         </CardTitle>
         {(listing.priceWeekly || listing.priceMonthly) && (
@@ -166,11 +198,21 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
         )}
       </CardHeader>
 
-      {/* ── Scroll interno: el card no crece, solo scrollea por dentro ── */}
       <CardContent className="p-0">
         <div className="overflow-y-auto max-h-[600px] px-6 pb-6 space-y-4">
 
-          {/* Calendario */}
+          {/* ── Aviso datos bancarios del host ── */}
+          {!hostHasPayoutMethod && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md p-3">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-800 leading-tight">
+                El propietario todavía no configuró sus datos de cobro. Podés
+                reservar, pero el pago quedará en espera hasta que los complete.
+              </p>
+            </div>
+          )}
+
+          {/* ── Calendario ── */}
           <div className="space-y-2">
             <label className="text-sm font-semibold">Seleccioná las fechas</label>
             <div className="border border-border rounded-md p-3 bg-card">
@@ -193,36 +235,60 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
             )}
           </div>
 
-          {/* Desglose de costos */}
+          {/* ── Desglose de costos ── */}
           {priceInfo && (
             <div className="space-y-3 pt-4 border-t border-border">
+
+              {/* Precio base */}
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Reserva por {priceInfo.breakdown}</span>
-                <span className="font-medium">${priceInfo.total.toLocaleString()}</span>
+                <span className="text-muted-foreground">
+                  Reserva por {priceInfo.breakdown}
+                </span>
+                <span className="font-medium">
+                  ${priceInfo.basePrice.toLocaleString()}
+                </span>
               </div>
 
+              {/* Comisión Doorly al inquilino */}
               <div className="flex justify-between text-sm">
                 <div className="flex flex-col">
                   <span className="flex items-center gap-1.5 font-medium text-foreground">
                     Comisión Doorly
-                    <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none text-[9px] h-4 px-1.5 uppercase font-bold">
-                      Promo Lanzamiento
-                    </Badge>
+                    {!DOORLY_COMMISSION_ENABLED && (
+                      <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none text-[9px] h-4 px-1.5 uppercase font-bold">
+                        Promo Lanzamiento
+                      </Badge>
+                    )}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">Bonificación del 100% aplicada</span>
+                  {!DOORLY_COMMISSION_ENABLED && (
+                    <span className="text-[10px] text-muted-foreground">
+                      Bonificación del 100% aplicada
+                    </span>
+                  )}
                 </div>
                 <div className="text-right">
-                  <span className="line-through text-muted-foreground text-xs mr-2">
-                    ${priceInfo.serviceFeeAmount.toLocaleString()}
-                  </span>
-                  <span className="text-green-600 font-bold">$0</span>
+                  {DOORLY_COMMISSION_ENABLED ? (
+                    <span className="font-medium">
+                      ${priceInfo.renterCommission.toLocaleString()}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="line-through text-muted-foreground text-xs mr-2">
+                        ${Math.round(priceInfo.basePrice * 0.12).toLocaleString()}
+                      </span>
+                      <span className="text-green-600 font-bold">$0</span>
+                    </>
+                  )}
                 </div>
               </div>
 
+              {/* Total */}
               <div className="flex justify-between items-center border-t border-dashed pt-4 mt-2">
-                <span className="text-base font-bold text-foreground">Total a pagar</span>
+                <span className="text-base font-bold text-foreground">
+                  Total a pagar
+                </span>
                 <span className="text-2xl font-black text-primary">
-                  ${priceInfo.total.toLocaleString()}
+                  ${priceInfo.renterTotal.toLocaleString()}
                 </span>
               </div>
 
@@ -235,7 +301,7 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
             </div>
           )}
 
-          {/* Checkbox términos */}
+          {/* ── Checkbox términos ── */}
           <div className="flex items-start gap-2 pt-1">
             <Checkbox
               id="terms-booking"
@@ -247,11 +313,19 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
               className="text-xs font-normal text-muted-foreground leading-relaxed cursor-pointer"
             >
               Acepto los{" "}
-              <Link href="/terminos" target="_blank" className="text-primary underline underline-offset-2">
+              <Link
+                href="/terminos"
+                target="_blank"
+                className="text-primary underline underline-offset-2"
+              >
                 Términos y Condiciones
               </Link>{" "}
               y la{" "}
-              <Link href="/privacidad" target="_blank" className="text-primary underline underline-offset-2">
+              <Link
+                href="/privacidad"
+                target="_blank"
+                className="text-primary underline underline-offset-2"
+              >
                 Política de Privacidad
               </Link>{" "}
               de Doorly
@@ -260,7 +334,12 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
 
           <Button
             onClick={handleReserve}
-            disabled={!dateRange?.from || !dateRange?.to || isReserving || !acceptedTerms}
+            disabled={
+              !dateRange?.from ||
+              !dateRange?.to ||
+              isReserving ||
+              !acceptedTerms
+            }
             className="w-full shadow-md hover:shadow-lg transition-all"
             size="lg"
           >
@@ -275,10 +354,9 @@ export function BookingWidget({ listing, blockedDates }: BookingWidgetProps) {
           </Button>
 
           <p className="text-[11px] text-muted-foreground text-center leading-relaxed px-2">
-            Al hacer clic en "Reservar ahora", serás redirigido a Mercado Pago para completar la
-            operación de forma segura.
+            Al hacer clic en "Reservar ahora", serás redirigido a Mercado Pago
+            para completar la operación de forma segura.
           </p>
-
         </div>
       </CardContent>
     </Card>
