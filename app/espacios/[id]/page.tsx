@@ -72,8 +72,6 @@ export default async function EspacioDetailPage({
 
 const hostHasPayoutMethod = !!hostPayoutData;
 
-  const hostHasPayoutMethod = !!hostPayoutData;
-
   const blockedDates = (bookingsData || []).map((b) => ({
     listingId: id,
     startDate: b.start_date,
