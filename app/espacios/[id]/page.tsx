@@ -20,7 +20,7 @@ function getApproxCoords(lat: number, lng: number, id: string) {
   const lngOffset = (((seed * 7) % 100) - 50) * 0.00008;
   return { lat: lat + latOffset, lng: lng + lngOffset };
 }
-
+export const revalidate = 0;
 export default async function EspacioDetailPage({
   params,
 }: {
@@ -64,10 +64,13 @@ export default async function EspacioDetailPage({
 
   // Verificar si el host tiene datos bancarios cargados
   const { data: hostPayoutData } = await supabase
-    .from("payout_methods")
-    .select("id")
-    .eq("profile_id", rawListing.host_id)
-    .maybeSingle();
+  .from("payout_methods")
+  .select("id")
+  .eq("profile_id", rawListing.host_id)
+  .maybeSingle()
+  .then((res) => res); // fuerza re-evaluación
+
+const hostHasPayoutMethod = !!hostPayoutData;
 
   const hostHasPayoutMethod = !!hostPayoutData;
 

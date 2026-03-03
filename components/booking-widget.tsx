@@ -203,14 +203,15 @@ export function BookingWidget({
 
           {/* ── Aviso datos bancarios del host ── */}
           {!hostHasPayoutMethod && (
-            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md p-3">
-              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-              <p className="text-xs text-amber-800 leading-tight">
-                El propietario todavía no configuró sus datos de cobro. Podés
-                reservar, pero el pago quedará en espera hasta que los complete.
-              </p>
-            </div>
-          )}
+  <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-md p-3">
+    <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+    <p className="text-xs text-red-800 leading-tight">
+      Este espacio no está disponible para reservar por el momento. El
+      propietario aún no configuró sus datos de cobro. Intentá más tarde
+      o explorá otros espacios.
+    </p>
+  </div>
+)}
 
           {/* ── Calendario ── */}
           <div className="space-y-2">
@@ -335,11 +336,12 @@ export function BookingWidget({
           <Button
             onClick={handleReserve}
             disabled={
-              !dateRange?.from ||
-              !dateRange?.to ||
-              isReserving ||
-              !acceptedTerms
-            }
+  !dateRange?.from ||
+  !dateRange?.to ||
+  isReserving ||
+  !acceptedTerms ||
+  !hostHasPayoutMethod
+}
             className="w-full shadow-md hover:shadow-lg transition-all"
             size="lg"
           >
