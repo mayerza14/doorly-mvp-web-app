@@ -14,13 +14,15 @@ import { PhotoCarousel } from "@/components/photo-carousel";
 import { DoorlyCertifiedBadge } from "@/components/doorly-certified-badge";
 import { ListingQuestions } from "@/components/listing-questions";
 
+export const revalidate = 0;
+
 function getApproxCoords(lat: number, lng: number, id: string) {
   const seed = id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
   const latOffset = ((seed % 100) - 50) * 0.00008;
   const lngOffset = (((seed * 7) % 100) - 50) * 0.00008;
   return { lat: lat + latOffset, lng: lng + lngOffset };
 }
-export const revalidate = 0;
+
 export default async function EspacioDetailPage({
   params,
 }: {
