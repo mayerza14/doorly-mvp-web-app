@@ -11,7 +11,11 @@ export const DOORLY_COMMISSION_ENABLED = false;
 export const COMMISSION_RENTER_RATE = 0.12; // 12%
 
 // Comisión que se le descuenta al host (propietario) de lo que le corresponde
-export const COMMISSION_HOST_RATE = 0.03; // 3%
+export const COMMISSION_HOST_RATE = 0.05; // 5%
+
+// Comisión que cobra MercadoPago sobre el total cobrado al inquilino
+// Checkout Pro Argentina — puede variar levemente según medio de pago
+export const MP_FEE_RATE = 0.0761; // 7,61%
 
 /**
  * Comisión que paga el inquilino (se suma al precio base).
@@ -40,9 +44,45 @@ export function calcHostCommission(basePrice: number): number {
 }
 
 /**
- * Lo que efectivamente recibe el host (precio base - comisión host).
+ * Lo que efectivamente recibe el host (precio base - comisión host Doorly).
  * Este es el monto que Doorly le transfiere al host.
  */
 export function calcHostPayout(basePrice: number): number {
   return basePrice - calcHostCommission(basePrice);
+}
+
+/**
+ * Comisión de MercadoPago sobre el monto cobrado.
+ * Se descuenta antes de que el dinero llegue a la cuenta de Doorly.
+ */
+export function calcMpFee(chargedAmount: number): number {
+  return Math.round(chargedAmount * MP_FEE_RATE);
+}
+
+/**
+ * Neto estimado que recibe Doorly después de la comisión de MP.
+ * Nota: puede variar levemente según retenciones impositivas de la provincia del pagador.
+ */
+export function calcNetAfterMp(chargedAmount: number): number {
+  return chargedAmount - calcMpFee(chargedAmount);
+}
+
+/**
+ * Desglose completo para mostrarle al host en su dashboard.
+ * totalCharged = lo que pagó el inquilino (total_amount en la reserva)
+ * basePrice    = precio base del espacio (amount en la reserva)
+ */
+export function calcHostBreakdown(totalCharged: number, basePrice: number) {
+  const mpFee = calcMpFee(totalCharged);
+  const netAfterMp = totalCharged - mpFee;
+  const doorlyCommission = calcHostCommission(basePrice);
+  const hostPayout = netAfterMp - doorlyCommission;
+
+  return {
+    totalCharged,      // Lo que pagó el inquilino
+    mpFee,             // Comisión MP (~7,61%)
+    netAfterMp,        // Lo que entra a la cuenta Doorly
+    doorlyCommission,  // Comisión Doorly al host (0 durante lanzamiento)
+    hostPayout,        // Lo que Doorly le transfiere al host
+  };
 }

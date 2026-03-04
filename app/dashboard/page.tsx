@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/table";
 import {
   Plus, Eye, Edit, Loader2, MessageSquare, Calendar, Trash2,
-  AlertTriangle, User, Landmark, Save, ShieldCheck, AlertCircle, Pencil, Phone,
+  AlertTriangle, User, Landmark, Save, ShieldCheck, AlertCircle,
+  Pencil, Phone, Banknote, Star,
 } from "lucide-react";
 import { ChatWidget } from "@/components/chat-widget";
 import {
@@ -29,19 +30,20 @@ import { LeaveReview } from "@/components/leave-review";
 import { CertificationRequestModal } from "@/components/certification-request-modal";
 import { DoorlyCertifiedBadge } from "@/components/doorly-certified-badge";
 import { PendingQuestionsBadge } from "@/components/pending-questions-badge";
+import { calcHostBreakdown, DOORLY_COMMISSION_ENABLED } from "@/lib/commission";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PaymentVerifier: componente separado para poder usar useSearchParams
-// dentro de un Suspense boundary (requerido por Next.js App Router)
+// PaymentVerifier — separado para poder usar useSearchParams en Suspense
 // ─────────────────────────────────────────────────────────────────────────────
 type VerificationStatus = "loading" | "confirmed" | "pending" | "error";
 
-interface PaymentVerifierProps {
+function PaymentVerifier({
+  user,
+  onResult,
+}: {
   user: any;
   onResult: (status: VerificationStatus, message: string) => void;
-}
-
-function PaymentVerifier({ user, onResult }: PaymentVerifierProps) {
+}) {
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -52,18 +54,14 @@ function PaymentVerifier({ user, onResult }: PaymentVerifierProps) {
       onResult("error", "El pago no se completó. Podés intentarlo de nuevo.");
       return;
     }
-
     if (pago === "pendiente") {
       onResult("pending", "Tu pago está siendo procesado. Te avisaremos cuando se confirme.");
       return;
     }
-
     if (pago === "ok") {
       onResult("loading", "Verificando tu pago...");
-
       (async () => {
         try {
-          // Buscamos el booking más reciente con mp_status created o approved
           const { data: latestBooking } = await supabase
             .from("bookings")
             .select("id")
@@ -90,7 +88,7 @@ function PaymentVerifier({ user, onResult }: PaymentVerifierProps) {
           if (data.status === "confirmed") {
             onResult("confirmed", "¡Tu reserva está confirmada! 🎉");
           } else if (data.status === "pending") {
-            onResult("pending", "Tu pago está siendo procesado. Actualizá la página en unos minutos.");
+            onResult("pending", "Tu pago está siendo procesado. Actualizá en unos minutos.");
           } else {
             onResult("error", "El pago no pudo confirmarse. Si se acreditó, contactanos.");
           }
@@ -110,30 +108,44 @@ function PaymentVerifier({ user, onResult }: PaymentVerifierProps) {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, profile, isLoading: authLoading } = useAuth();
-  const [reviewedBookings, setReviewedBookings] = useState<Set<string>>(new Set());
 
-  const isHost = profile?.role === "host" || profile?.role === "both" || profile?.role === "admin";
-  const isRenter = profile?.role === "renter" || profile?.role === "both" || profile?.role === "admin";
+  const isHost =
+    profile?.role === "host" || profile?.role === "both" || profile?.role === "admin";
+  const isRenter =
+    profile?.role === "renter" || profile?.role === "both" || profile?.role === "admin";
+
   const [activeTab, setActiveTab] = useState<string>(isHost ? "espacios" : "reservas");
 
+  // Listings
   const [listings, setListings] = useState<any[]>([]);
-  const [bookings, setBookings] = useState<any[]>([]);
   const [isLoadingListings, setIsLoadingListings] = useState(true);
-  const [isLoadingBookings, setIsLoadingBookings] = useState(true);
-  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  // Estado de verificación de pago
+  // Reservas hechas por el usuario como inquilino
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [isLoadingBookings, setIsLoadingBookings] = useState(true);
+  const [reviewedBookings, setReviewedBookings] = useState<Set<string>>(new Set());
+  const [openReviewId, setOpenReviewId] = useState<string | null>(null);
+
+  // Reservas recibidas en los espacios del usuario como host
+  const [hostBookings, setHostBookings] = useState<any[]>([]);
+  const [isLoadingHostBookings, setIsLoadingHostBookings] = useState(true);
+
+  // Chat
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+
+  // Verificación de pago
   const [paymentVerification, setPaymentVerification] = useState<{
     status: VerificationStatus | null;
     message: string;
   }>({ status: null, message: "" });
 
+  // Modal certificación
   const [certificationModal, setCertificationModal] = useState<{
     open: boolean; listingId: string; listingTitle: string;
   }>({ open: false, listingId: "", listingTitle: "" });
 
-  // Payout
+  // Datos de cobro
   const [hasPayoutMethod, setHasPayoutMethod] = useState(true);
   const [isLoadingPayout, setIsLoadingPayout] = useState(true);
   const [isSavingPayout, setIsSavingPayout] = useState(false);
@@ -146,88 +158,94 @@ export default function DashboardPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState({ type: "", text: "" });
-  const [profileData, setProfileData] = useState({
-    fullName: "",
-    phone: "",
-  });
+  const [profileData, setProfileData] = useState({ fullName: "", phone: "" });
 
-  // Redirigir si no hay sesión
+  // ── Guard ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!authLoading && !user) router.push("/auth?returnUrl=/dashboard");
   }, [user, authLoading, router]);
 
-  // Cargar datos del perfil
+  // ── Cargar perfil ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user || !profile) return;
-    setProfileData({
-      fullName: profile.full_name || "",
-      phone: profile.phone || "",
-    });
+    setProfileData({ fullName: profile.full_name || "", phone: profile.phone || "" });
   }, [user, profile]);
 
-  // Cargar datos de cobro
+  // ── Cargar datos de cobro ─────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    const fetchPayoutData = async () => {
+    (async () => {
       const { data } = await supabase
-        .from("payout_methods")
-        .select("*")
-        .eq("profile_id", user.id)
-        .maybeSingle();
+        .from("payout_methods").select("*").eq("profile_id", user.id).maybeSingle();
       if (data) {
         setPayoutData({
-          fullName: data.full_name,
-          cuitCuil: data.cuit_cuil,
-          bankName: data.bank_name,
-          cbuCvu: data.cbu_cvu,
-          alias: data.alias || "",
+          fullName: data.full_name, cuitCuil: data.cuit_cuil,
+          bankName: data.bank_name, cbuCvu: data.cbu_cvu, alias: data.alias || "",
         });
         setHasPayoutMethod(true);
       } else {
         setHasPayoutMethod(false);
       }
       setIsLoadingPayout(false);
-    };
-    fetchPayoutData();
+    })();
   }, [user]);
 
-  // Cargar publicaciones
+  // ── Cargar publicaciones ──────────────────────────────────────────────────
   const fetchListings = async () => {
     if (!user) return;
     const { data, error } = await supabase
       .from("listings")
-      .select(`*, bookings(id, status)`)
+      .select("*, bookings(id, status)")
       .eq("host_id", user.id)
       .neq("status", "disabled")
       .order("created_at", { ascending: false });
     if (!error && data) {
-      const processedListings = data.map((listing) => {
-        const hasActiveBookings = listing.bookings?.some(
+      setListings(data.map((l) => ({
+        ...l,
+        hasActiveBookings: l.bookings?.some(
           (b: any) => b.status === "confirmed" || b.status === "pending_payment"
-        );
-        return { ...listing, hasActiveBookings };
-      });
-      setListings(processedListings);
+        ),
+      })));
     }
     setIsLoadingListings(false);
   };
 
   useEffect(() => { fetchListings(); }, [user]);
 
-  // Cargar reservas
+  // ── Cargar reservas del inquilino ─────────────────────────────────────────
   const fetchBookings = async () => {
     if (!user) return;
     const { data, error } = await supabase.functions.invoke("my-bookings", { method: "GET" });
     if (!error && data?.bookings) setBookings(data.bookings);
-    else if (error) console.error("Error fetching bookings:", error);
     setIsLoadingBookings(false);
   };
 
   useEffect(() => { fetchBookings(); }, [user]);
 
-  // Cuando el pago se confirma: recargar reservas y navegar al tab correcto
+  // ── Cargar reservas recibidas del host ────────────────────────────────────
+  const fetchHostBookings = async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from("bookings")
+      .select(`
+        id, status, mp_status, start_date, end_date,
+        amount, total_amount, mp_amount_paid, paid_at,
+        renter_id, listing:listing_id (title)
+      `)
+      .eq("host_id", user.id)
+      .order("created_at", { ascending: false });
+    if (!error && data) setHostBookings(data);
+    setIsLoadingHostBookings(false);
+  };
+
+  useEffect(() => { fetchHostBookings(); }, [user]);
+
+  // ── Reaccionar a verificación de pago ─────────────────────────────────────
   useEffect(() => {
-    if (paymentVerification.status === "confirmed" || paymentVerification.status === "loading") {
+    if (
+      paymentVerification.status === "confirmed" ||
+      paymentVerification.status === "loading"
+    ) {
       setActiveTab("reservas");
     }
     if (paymentVerification.status === "confirmed") {
@@ -236,15 +254,14 @@ export default function DashboardPage() {
   }, [paymentVerification.status]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-
   const handleDeleteListing = async (listingId: string) => {
     setIsDeleting(listingId);
     try {
-      const { error } = await supabase.from("listings").update({ status: "disabled" }).eq("id", listingId);
+      const { error } = await supabase
+        .from("listings").update({ status: "disabled" }).eq("id", listingId);
       if (error) throw error;
       setListings((prev) => prev.filter((l) => l.id !== listingId));
-    } catch (error) {
-      console.error("Error deleting listing:", error);
+    } catch {
       alert("No se pudo eliminar la publicación.");
     } finally {
       setIsDeleting(null);
@@ -254,11 +271,13 @@ export default function DashboardPage() {
   const handleTogglePause = async (listingId: string, currentStatus: string) => {
     const newStatus = currentStatus === "paused" ? "approved" : "paused";
     try {
-      const { error } = await supabase.from("listings").update({ status: newStatus }).eq("id", listingId);
+      const { error } = await supabase
+        .from("listings").update({ status: newStatus }).eq("id", listingId);
       if (error) throw error;
-      setListings((prev) => prev.map((l) => (l.id === listingId ? { ...l, status: newStatus } : l)));
-    } catch (error) {
-      console.error("Error al cambiar estado:", error);
+      setListings((prev) =>
+        prev.map((l) => (l.id === listingId ? { ...l, status: newStatus } : l))
+      );
+    } catch {
       alert("No se pudo cambiar el estado de la publicación.");
     }
   };
@@ -274,17 +293,13 @@ export default function DashboardPage() {
     try {
       const { error } = await supabase.from("payout_methods").upsert({
         profile_id: user?.id,
-        full_name: payoutData.fullName,
-        cuit_cuil: payoutData.cuitCuil,
-        bank_name: payoutData.bankName,
-        cbu_cvu: payoutData.cbuCvu,
-        alias: payoutData.alias,
+        full_name: payoutData.fullName, cuit_cuil: payoutData.cuitCuil,
+        bank_name: payoutData.bankName, cbu_cvu: payoutData.cbuCvu, alias: payoutData.alias,
       });
       if (error) throw error;
       setPayoutMessage({ type: "success", text: "Datos bancarios guardados correctamente." });
       setHasPayoutMethod(true);
-    } catch (error) {
-      console.error(error);
+    } catch {
       setPayoutMessage({ type: "error", text: "Error al guardar los datos." });
     } finally {
       setIsSavingPayout(false);
@@ -306,16 +321,12 @@ export default function DashboardPage() {
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({
-          full_name: profileData.fullName.trim(),
-          phone: profileData.phone.trim() || null,
-        })
+        .update({ full_name: profileData.fullName.trim(), phone: profileData.phone.trim() || null })
         .eq("id", user?.id);
       if (error) throw error;
       setProfileMessage({ type: "success", text: "Perfil actualizado correctamente." });
       setIsEditingProfile(false);
-    } catch (error) {
-      console.error(error);
+    } catch {
       setProfileMessage({ type: "error", text: "Error al guardar los datos." });
     } finally {
       setIsSavingProfile(false);
@@ -323,27 +334,20 @@ export default function DashboardPage() {
   };
 
   // ── Guard de carga ─────────────────────────────────────────────────────────
-
   if (authLoading || !user || !profile) return null;
 
   const displayName = profile.full_name || user.user_metadata?.full_name || user.email;
 
-  // ── Helpers de UI ──────────────────────────────────────────────────────────
-
+  // ── Helper badges ─────────────────────────────────────────────────────────
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "approved":
-      case "active":
-      case "confirmed":
+      case "approved": case "active": case "confirmed":
         return <Badge className="bg-green-600 hover:bg-green-700 text-white">Confirmada</Badge>;
-      case "pending_review":
-      case "hold":
+      case "pending_review": case "hold":
         return <Badge variant="secondary">En proceso</Badge>;
-      case "rejected":
-      case "cancelled":
+      case "rejected": case "cancelled":
         return <Badge variant="destructive">Cancelada</Badge>;
-      case "disabled":
-      case "suspended":
+      case "disabled": case "suspended":
         return <Badge variant="outline" className="text-muted-foreground">Deshabilitado</Badge>;
       case "paused":
         return <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">Pausada</Badge>;
@@ -354,13 +358,15 @@ export default function DashboardPage() {
     }
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // Calcular cantidad de tabs para el grid
+  const tabCount = [isHost, isHost, isRenter, true, true].filter(Boolean).length;
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <AppShell>
       <div className="container max-w-7xl mx-auto px-4 py-8">
 
-        {/* Verificador de pago — separado en Suspense para cumplir con Next.js App Router */}
+        {/* Verificador de pago */}
         <Suspense fallback={null}>
           <PaymentVerifier
             user={user}
@@ -368,7 +374,7 @@ export default function DashboardPage() {
           />
         </Suspense>
 
-        {/* Banner de resultado del pago */}
+        {/* Banner resultado de pago */}
         {paymentVerification.status && (
           <div className={`p-4 rounded-lg mb-4 flex items-center gap-3 ${
             paymentVerification.status === "confirmed"
@@ -379,29 +385,21 @@ export default function DashboardPage() {
               ? "bg-blue-50 border border-blue-200 text-blue-800"
               : "bg-red-50 border border-red-200 text-red-800"
           }`}>
-            {paymentVerification.status === "loading" && (
-              <Loader2 className="h-5 w-5 animate-spin shrink-0" />
-            )}
-            {paymentVerification.status === "confirmed" && (
-              <ShieldCheck className="h-5 w-5 shrink-0" />
-            )}
-            {paymentVerification.status === "error" && (
-              <AlertCircle className="h-5 w-5 shrink-0" />
-            )}
-            {paymentVerification.status === "pending" && (
-              <AlertTriangle className="h-5 w-5 shrink-0" />
-            )}
+            {paymentVerification.status === "loading" && <Loader2 className="h-5 w-5 animate-spin shrink-0" />}
+            {paymentVerification.status === "confirmed" && <ShieldCheck className="h-5 w-5 shrink-0" />}
+            {paymentVerification.status === "error" && <AlertCircle className="h-5 w-5 shrink-0" />}
+            {paymentVerification.status === "pending" && <AlertTriangle className="h-5 w-5 shrink-0" />}
             <p className="text-sm font-medium">{paymentVerification.message}</p>
           </div>
         )}
 
         {/* Alerta datos de cobro */}
         {isHost && !isLoadingPayout && !hasPayoutMethod && (
-          <div className="bg-destructive/10 border-l-4 border-destructive text-destructive p-4 rounded-r-lg mb-8 shadow-sm flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="bg-destructive/10 border-l-4 border-destructive text-destructive p-4 rounded-r-lg mb-8 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             <div className="flex gap-3 items-start sm:items-center">
-              <AlertTriangle className="h-6 w-6 text-destructive flex-shrink-0" />
+              <AlertTriangle className="h-6 w-6 flex-shrink-0" />
               <div>
-                <h3 className="font-bold text-destructive">¡Atención! Faltan tus datos de cobro</h3>
+                <h3 className="font-bold">¡Atención! Faltan tus datos de cobro</h3>
                 <p className="text-sm opacity-90">Para recibir el dinero de tus reservas, necesitás configurar tu CBU/CVU.</p>
               </div>
             </div>
@@ -417,14 +415,18 @@ export default function DashboardPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto p-1">
-            {isHost && <TabsTrigger value="espacios" className="py-2">Mis espacios</TabsTrigger>}
-            {isRenter && <TabsTrigger value="reservas" className="py-2">Mis reservas</TabsTrigger>}
-            <TabsTrigger value="mensajes" className="py-2">Mensajes</TabsTrigger>
-            <TabsTrigger value="perfil" className="py-2">Mi perfil</TabsTrigger>
+          <TabsList
+            className="grid w-full h-auto p-1"
+            style={{ gridTemplateColumns: `repeat(${tabCount}, minmax(0, 1fr))` }}
+          >
+            {isHost && <TabsTrigger value="espacios" className="py-2 text-xs sm:text-sm">Mis espacios</TabsTrigger>}
+            {isHost && <TabsTrigger value="recibidas" className="py-2 text-xs sm:text-sm">Reservas recibidas</TabsTrigger>}
+            {isRenter && <TabsTrigger value="reservas" className="py-2 text-xs sm:text-sm">Mis reservas</TabsTrigger>}
+            <TabsTrigger value="mensajes" className="py-2 text-xs sm:text-sm">Mensajes</TabsTrigger>
+            <TabsTrigger value="perfil" className="py-2 text-xs sm:text-sm">Mi perfil</TabsTrigger>
           </TabsList>
 
-          {/* ── TAB: MIS ESPACIOS ── */}
+          {/* ══ TAB: MIS ESPACIOS ══ */}
           {isHost && (
             <TabsContent value="espacios" className="space-y-6">
               <PendingQuestionsBadge />
@@ -473,7 +475,7 @@ export default function DashboardPage() {
                             <TableRow>
                               <TableCell>
                                 <div className="space-y-1">
-                                  <div className="font-medium text-foreground">{listing.title}</div>
+                                  <div className="font-medium">{listing.title}</div>
                                   {listing.doorly_certified && <DoorlyCertifiedBadge size="sm" />}
                                   {listing.status === "rejected" && listing.rejection_reason && (
                                     <div className="mt-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-2">
@@ -488,17 +490,17 @@ export default function DashboardPage() {
                               <TableCell>{getStatusBadge(listing.status)}</TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-1">
-                                  <Button variant="ghost" size="icon" title="Ver publicación" asChild>
+                                  <Button variant="ghost" size="icon" title="Ver" asChild>
                                     <Link href={`/espacios/${listing.id}`}><Eye className="h-4 w-4" /></Link>
                                   </Button>
-                                  <Button variant="ghost" size="icon" title="Editar publicación" asChild>
+                                  <Button variant="ghost" size="icon" title="Editar" asChild>
                                     <Link href={`/publicar?edit=${listing.id}`}><Edit className="h-4 w-4 text-muted-foreground" /></Link>
                                   </Button>
 
                                   {(listing.status === "approved" || listing.status === "paused") && (
                                     <AlertDialog>
                                       <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="icon" title={listing.status === "paused" ? "Reactivar" : "Pausar"}>
+                                        <Button variant="ghost" size="icon">
                                           {listing.status === "paused"
                                             ? <span className="text-green-600" style={{ fontSize: 16 }}>▶</span>
                                             : <span className="text-amber-500" style={{ fontSize: 16 }}>⏸</span>}
@@ -532,7 +534,7 @@ export default function DashboardPage() {
 
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="icon" title="Eliminar publicación">
+                                      <Button variant="ghost" size="icon">
                                         {isDeleting === listing.id
                                           ? <Loader2 className="h-4 w-4 animate-spin" />
                                           : <Trash2 className="h-4 w-4 text-destructive" />}
@@ -545,7 +547,7 @@ export default function DashboardPage() {
                                             <AlertDialogTitle className="flex items-center gap-2">
                                               <AlertTriangle className="h-5 w-5 text-destructive" />No se puede eliminar
                                             </AlertDialogTitle>
-                                            <AlertDialogDescription className="text-foreground">
+                                            <AlertDialogDescription>
                                               Este espacio tiene reservas activas o pendientes de pago.
                                             </AlertDialogDescription>
                                           </AlertDialogHeader>
@@ -555,9 +557,7 @@ export default function DashboardPage() {
                                         <>
                                           <AlertDialogHeader>
                                             <AlertDialogTitle>¿Eliminar publicación?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              Esta acción es permanente. Los usuarios ya no podrán encontrarlo.
-                                            </AlertDialogDescription>
+                                            <AlertDialogDescription>Esta acción es permanente.</AlertDialogDescription>
                                           </AlertDialogHeader>
                                           <AlertDialogFooter>
                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -586,18 +586,16 @@ export default function DashboardPage() {
                                         <ShieldCheck className="h-4 w-4 text-primary" />
                                       </div>
                                       <div>
-                                        <p className="text-sm font-semibold text-foreground">Certificá este espacio y conseguí más reservas</p>
+                                        <p className="text-sm font-semibold">Certificá este espacio y conseguí más reservas</p>
                                         <p className="text-xs text-muted-foreground">Un Doorlier visita tu espacio y te otorga el badge oficial.</p>
                                       </div>
                                     </div>
                                     <Button
-                                      size="sm"
-                                      variant="outline"
+                                      size="sm" variant="outline"
                                       className="shrink-0 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground"
                                       onClick={() => setCertificationModal({ open: true, listingId: listing.id, listingTitle: listing.title })}
                                     >
-                                      <ShieldCheck className="h-4 w-4 mr-1.5" />
-                                      Solicitar certificación
+                                      <ShieldCheck className="h-4 w-4 mr-1.5" />Solicitar certificación
                                     </Button>
                                   </div>
                                 </TableCell>
@@ -610,7 +608,6 @@ export default function DashboardPage() {
                   )}
                 </CardContent>
               </Card>
-
               <CertificationRequestModal
                 open={certificationModal.open}
                 onOpenChange={(open) => setCertificationModal((prev) => ({ ...prev, open }))}
@@ -620,7 +617,134 @@ export default function DashboardPage() {
             </TabsContent>
           )}
 
-          {/* ── TAB: MIS RESERVAS ── */}
+          {/* ══ TAB: RESERVAS RECIBIDAS (HOST) ══ */}
+          {isHost && (
+            <TabsContent value="recibidas" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Reservas recibidas</CardTitle>
+                  <CardDescription>
+                    Reservas hechas en tus espacios y el desglose financiero de cada una
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingHostBookings ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : hostBookings.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Banknote className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-30" />
+                      <p className="text-muted-foreground">Todavía no recibiste ninguna reserva</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {hostBookings.map((booking) => {
+                        const totalCharged = Number(booking.total_amount ?? booking.amount ?? 0);
+                        const basePrice = Number(booking.amount ?? 0);
+                        const breakdown = calcHostBreakdown(totalCharged, basePrice);
+                        const isConfirmed =
+                          booking.status === "confirmed" && booking.mp_status === "approved";
+
+                        return (
+                          <div
+                            key={booking.id}
+                            className={`rounded-xl border p-4 space-y-3 ${
+                              isConfirmed
+                                ? "border-green-200 bg-green-50/30"
+                                : "border-border bg-card"
+                            }`}
+                          >
+                            {/* Encabezado */}
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-sm">{booking.listing?.title || "Espacio"}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {new Date(booking.start_date).toLocaleDateString("es-AR")}
+                                  {booking.start_date !== booking.end_date && (
+                                    <> → {new Date(booking.end_date).toLocaleDateString("es-AR")}</>
+                                  )}
+                                </p>
+                              </div>
+                              {getStatusBadge(booking.status)}
+                            </div>
+
+                            {/* Desglose financiero — solo reservas confirmadas */}
+                            {isConfirmed ? (
+                              <div className="bg-white rounded-lg border border-green-100 p-3 space-y-2">
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                                  Desglose del pago
+                                </p>
+
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Total cobrado al guardador</span>
+                                  <span className="font-medium">${breakdown.totalCharged.toLocaleString("es-AR")}</span>
+                                </div>
+
+                                <div className="flex justify-between text-sm">
+                                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                                    Comisión MercadoPago (~7,61%)
+                                    <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                                      descontada por MP
+                                    </span>
+                                  </span>
+                                  <span className="text-red-500 font-medium">
+                                    -${breakdown.mpFee.toLocaleString("es-AR")}
+                                  </span>
+                                </div>
+
+                                <div className="flex justify-between text-sm">
+                                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                                    Comisión Doorly
+                                    {!DOORLY_COMMISSION_ENABLED && (
+                                      <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold uppercase">
+                                        Promo Lanzamiento
+                                      </span>
+                                    )}
+                                  </span>
+                                  {DOORLY_COMMISSION_ENABLED ? (
+                                    <span className="text-red-500 font-medium">
+                                      -${breakdown.doorlyCommission.toLocaleString("es-AR")}
+                                    </span>
+                                  ) : (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="line-through text-muted-foreground text-xs">
+                                        -${Math.round(basePrice * 0.05).toLocaleString("es-AR")}
+                                      </span>
+                                      <span className="text-green-600 font-bold text-sm">$0</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="border-t border-dashed border-green-200 pt-2 mt-1">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-bold text-sm">Recibís (transferencia Doorly)</span>
+                                    <span className="text-lg font-black text-green-700">
+                                      ${breakdown.hostPayout.toLocaleString("es-AR")}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
+                                    * Puede variar levemente por retenciones según la provincia del pagador.
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex justify-between text-sm text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
+                                <span>Precio base</span>
+                                <span className="font-medium">${basePrice.toLocaleString("es-AR")}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* ══ TAB: MIS RESERVAS (INQUILINO) ══ */}
           {isRenter && (
             <TabsContent value="reservas" className="space-y-6">
               <Card>
@@ -648,6 +772,7 @@ export default function DashboardPage() {
                           <TableHead className="hidden sm:table-cell">Hasta</TableHead>
                           <TableHead>Total</TableHead>
                           <TableHead>Estado</TableHead>
+                          <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -662,11 +787,14 @@ export default function DashboardPage() {
                             now >= openAt &&
                             now < closeAt &&
                             !reviewedBookings.has(booking.id);
+                          const isReviewOpen = openReviewId === booking.id;
 
                           return (
                             <React.Fragment key={booking.id}>
                               <TableRow>
-                                <TableCell className="font-medium">{booking.listing?.title || "N/A"}</TableCell>
+                                <TableCell className="font-medium">
+                                  {booking.listing?.title || "N/A"}
+                                </TableCell>
                                 <TableCell className="hidden sm:table-cell">
                                   {new Date(booking.start_date).toLocaleDateString("es-AR")}
                                 </TableCell>
@@ -677,17 +805,34 @@ export default function DashboardPage() {
                                   ${(booking.total_amount ?? booking.total_price)?.toLocaleString("es-AR") ?? "-"}
                                 </TableCell>
                                 <TableCell>{getStatusBadge(booking.status)}</TableCell>
+                                <TableCell className="text-right">
+                                  {canReview && (
+                                    <Button
+                                      variant="outline" size="sm"
+                                      className="text-xs gap-1.5 border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                                      onClick={() => setOpenReviewId(isReviewOpen ? null : booking.id)}
+                                    >
+                                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                                      {isReviewOpen ? "Cerrar" : "Reseña"}
+                                    </Button>
+                                  )}
+                                </TableCell>
                               </TableRow>
-                              {canReview && (
+
+                              {/* Panel de reseña expandible */}
+                              {canReview && isReviewOpen && (
                                 <TableRow>
-                                  <TableCell colSpan={5} className="pt-0 pb-3 px-4">
-                                    <LeaveReview
-                                      bookingId={booking.id}
-                                      listingTitle={booking.listing?.title || "Espacio"}
-                                      onReviewSubmitted={() =>
-                                        setReviewedBookings((prev) => new Set([...prev, booking.id]))
-                                      }
-                                    />
+                                  <TableCell colSpan={6} className="pt-0 pb-4 px-4 bg-yellow-50/30">
+                                    <div className="max-w-lg">
+                                      <LeaveReview
+                                        bookingId={booking.id}
+                                        listingTitle={booking.listing?.title || "Espacio"}
+                                        onReviewSubmitted={() => {
+                                          setReviewedBookings((prev) => new Set([...prev, booking.id]));
+                                          setOpenReviewId(null);
+                                        }}
+                                      />
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               )}
@@ -702,7 +847,7 @@ export default function DashboardPage() {
             </TabsContent>
           )}
 
-          {/* ── TAB: MENSAJES ── */}
+          {/* ══ TAB: MENSAJES ══ */}
           <TabsContent value="mensajes">
             <Card>
               <CardHeader className="pb-3">
@@ -737,7 +882,7 @@ export default function DashboardPage() {
                               selectedBookingId === b.id ? "bg-muted" : ""
                             }`}
                           >
-                            <p className="text-sm font-medium text-foreground truncate">{b.listing?.title || "Espacio"}</p>
+                            <p className="text-sm font-medium truncate">{b.listing?.title || "Espacio"}</p>
                             <p className="text-xs text-muted-foreground mt-0.5">
                               {new Date(b.start_date).toLocaleDateString("es-AR")} →{" "}
                               {new Date(b.end_date).toLocaleDateString("es-AR")}
@@ -754,7 +899,7 @@ export default function DashboardPage() {
                         <div className="flex flex-col items-center justify-center h-full text-center gap-3 rounded-xl border border-dashed bg-muted/20">
                           <MessageSquare className="h-10 w-10 text-muted-foreground opacity-20" />
                           <div>
-                            <p className="text-sm font-medium text-foreground">Seleccioná una reserva</p>
+                            <p className="text-sm font-medium">Seleccioná una reserva</p>
                             <p className="text-xs text-muted-foreground mt-1">Elegí una de la lista para ver la conversación</p>
                           </div>
                         </div>
@@ -766,7 +911,7 @@ export default function DashboardPage() {
             </Card>
           </TabsContent>
 
-          {/* ── TAB: MI PERFIL ── */}
+          {/* ══ TAB: MI PERFIL ══ */}
           <TabsContent value="perfil" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
 
@@ -780,13 +925,10 @@ export default function DashboardPage() {
                     </div>
                     {!isEditingProfile && (
                       <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary hover:text-primary"
+                        variant="ghost" size="sm" className="text-primary hover:text-primary"
                         onClick={() => { setIsEditingProfile(true); setProfileMessage({ type: "", text: "" }); }}
                       >
-                        <Pencil className="h-4 w-4 mr-1.5" />
-                        Editar
+                        <Pencil className="h-4 w-4 mr-1.5" />Editar
                       </Button>
                     )}
                   </div>
@@ -797,84 +939,59 @@ export default function DashboardPage() {
                     <form onSubmit={handleSaveProfile} className="space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="profileName">Nombre completo</Label>
-                        <Input
-                          id="profileName"
-                          value={profileData.fullName}
+                        <Input id="profileName" value={profileData.fullName} required
                           onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
-                          placeholder="Tu nombre completo"
-                          required
-                        />
+                          placeholder="Tu nombre completo" />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="profilePhone">
-                          <span className="flex items-center gap-1.5">
-                            <Phone className="h-3.5 w-3.5" />
-                            Teléfono (opcional)
-                          </span>
+                          <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />Teléfono (opcional)</span>
                         </Label>
-                        <Input
-                          id="profilePhone"
-                          value={profileData.phone}
+                        <Input id="profilePhone" type="tel" value={profileData.phone}
                           onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                          placeholder="Ej: +54 11 1234-5678"
-                          type="tel"
-                        />
+                          placeholder="Ej: +54 11 1234-5678" />
                         <p className="text-xs text-muted-foreground">Solo visible para vos y el equipo de Doorly.</p>
                       </div>
                       <div className="space-y-1">
                         <Label className="text-muted-foreground text-xs">Email (no editable)</Label>
-                        <p className="text-sm text-muted-foreground bg-muted/40 px-3 py-2 rounded-md border border-border">
-                          {user.email}
-                        </p>
+                        <p className="text-sm text-muted-foreground bg-muted/40 px-3 py-2 rounded-md border border-border">{user.email}</p>
                       </div>
                       {profileMessage.text && (
-                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${
-                          profileMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-                        }`}>
-                          {profileMessage.type === "success"
-                            ? <ShieldCheck className="h-4 w-4" />
-                            : <AlertCircle className="h-4 w-4" />}
+                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${profileMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                          {profileMessage.type === "success" ? <ShieldCheck className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                           {profileMessage.text}
                         </div>
                       )}
                       <div className="flex gap-2 pt-1">
                         <Button type="submit" disabled={isSavingProfile} className="flex-1">
-                          {isSavingProfile
-                            ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            : <Save className="h-4 w-4 mr-2" />}
+                          {isSavingProfile ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                           Guardar cambios
                         </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
+                        <Button type="button" variant="outline"
                           onClick={() => {
                             setIsEditingProfile(false);
                             setProfileData({ fullName: profile.full_name || "", phone: profile.phone || "" });
                             setProfileMessage({ type: "", text: "" });
                           }}
-                        >
-                          Cancelar
-                        </Button>
+                        >Cancelar</Button>
                       </div>
                     </form>
                   ) : (
                     <div className="space-y-4">
                       <div className="space-y-1">
                         <Label className="text-muted-foreground text-xs">Nombre completo</Label>
-                        <p className="font-medium text-foreground">{profile?.full_name || "No definido"}</p>
+                        <p className="font-medium">{profile?.full_name || "No definido"}</p>
                       </div>
                       <div className="space-y-1">
                         <Label className="text-muted-foreground text-xs">Email</Label>
-                        <p className="font-medium text-foreground">{user.email}</p>
+                        <p className="font-medium">{user.email}</p>
                       </div>
                       <div className="space-y-1">
                         <Label className="text-muted-foreground text-xs flex items-center gap-1">
-                          <Phone className="h-3 w-3" /> Teléfono
+                          <Phone className="h-3 w-3" />Teléfono
                         </Label>
-                        <p className="font-medium text-foreground">
-                          {profile?.phone || (
-                            <span className="text-muted-foreground text-sm italic">No cargado</span>
-                          )}
+                        <p className="font-medium">
+                          {profile?.phone || <span className="text-muted-foreground text-sm italic">No cargado</span>}
                         </p>
                       </div>
                       <div className="space-y-1">
@@ -882,12 +999,8 @@ export default function DashboardPage() {
                         <div><Badge variant="secondary" className="capitalize mt-1">{profile?.role}</Badge></div>
                       </div>
                       {profileMessage.text && (
-                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${
-                          profileMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-                        }`}>
-                          {profileMessage.type === "success"
-                            ? <ShieldCheck className="h-4 w-4" />
-                            : <AlertCircle className="h-4 w-4" />}
+                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${profileMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                          {profileMessage.type === "success" ? <ShieldCheck className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                           {profileMessage.text}
                         </div>
                       )}
@@ -897,9 +1010,7 @@ export default function DashboardPage() {
               </Card>
 
               {/* Datos de Cobro */}
-              <Card className={`border-2 transition-colors ${
-                !hasPayoutMethod && isHost ? "border-destructive/50 shadow-sm shadow-destructive/20" : "border-border"
-              }`}>
+              <Card className={`border-2 transition-colors ${!hasPayoutMethod && isHost ? "border-destructive/50" : "border-border"}`}>
                 <CardHeader className="bg-muted/30 border-b">
                   <div className="flex items-center gap-2">
                     <Landmark className="h-5 w-5 text-primary" />
@@ -916,79 +1027,46 @@ export default function DashboardPage() {
                     <form onSubmit={handleSavePayout} className="space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="fullName">Nombre del Titular</Label>
-                        <Input
-                          id="fullName"
-                          placeholder="Tal cual figura en tu banco"
-                          value={payoutData.fullName}
-                          onChange={(e) => setPayoutData({ ...payoutData, fullName: e.target.value })}
-                          required
-                        />
+                        <Input id="fullName" placeholder="Tal cual figura en tu banco"
+                          value={payoutData.fullName} onChange={(e) => setPayoutData({ ...payoutData, fullName: e.target.value })} required />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="cuit">CUIT / CUIL</Label>
-                          <Input
-                            id="cuit"
-                            placeholder="Sin guiones"
-                            value={payoutData.cuitCuil}
-                            onChange={(e) => setPayoutData({ ...payoutData, cuitCuil: e.target.value })}
-                            required
-                          />
+                          <Input id="cuit" placeholder="Sin guiones"
+                            value={payoutData.cuitCuil} onChange={(e) => setPayoutData({ ...payoutData, cuitCuil: e.target.value })} required />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="bank">Banco / Billetera</Label>
-                          <Input
-                            id="bank"
-                            placeholder="Ej: Mercado Pago"
-                            value={payoutData.bankName}
-                            onChange={(e) => setPayoutData({ ...payoutData, bankName: e.target.value })}
-                            required
-                          />
+                          <Input id="bank" placeholder="Ej: Mercado Pago"
+                            value={payoutData.bankName} onChange={(e) => setPayoutData({ ...payoutData, bankName: e.target.value })} required />
                         </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="cbu">CBU / CVU <span className="text-destructive">*</span></Label>
-                        <Input
-                          id="cbu"
-                          placeholder="22 dígitos"
-                          maxLength={22}
-                          value={payoutData.cbuCvu}
-                          onChange={(e) => setPayoutData({ ...payoutData, cbuCvu: e.target.value.replace(/\D/g, "") })}
-                          required
-                          className="font-mono tracking-widest"
-                        />
+                        <Input id="cbu" placeholder="22 dígitos" maxLength={22}
+                          value={payoutData.cbuCvu} className="font-mono tracking-widest"
+                          onChange={(e) => setPayoutData({ ...payoutData, cbuCvu: e.target.value.replace(/\D/g, "") })} required />
                         <div className="flex justify-between">
                           <p className="text-[10px] text-muted-foreground">Solo números</p>
-                          <p className={`text-[10px] font-medium ${
-                            payoutData.cbuCvu.length === 22 ? "text-green-600" : "text-muted-foreground"
-                          }`}>
+                          <p className={`text-[10px] font-medium ${payoutData.cbuCvu.length === 22 ? "text-green-600" : "text-muted-foreground"}`}>
                             {payoutData.cbuCvu.length}/22
                           </p>
                         </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="alias">Alias (Opcional)</Label>
-                        <Input
-                          id="alias"
-                          placeholder="puerta.casa.sol"
-                          value={payoutData.alias}
-                          onChange={(e) => setPayoutData({ ...payoutData, alias: e.target.value })}
-                        />
+                        <Input id="alias" placeholder="puerta.casa.sol"
+                          value={payoutData.alias} onChange={(e) => setPayoutData({ ...payoutData, alias: e.target.value })} />
                       </div>
                       {payoutMessage.text && (
-                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${
-                          payoutMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-                        }`}>
-                          {payoutMessage.type === "success"
-                            ? <ShieldCheck className="h-4 w-4" />
-                            : <AlertCircle className="h-4 w-4" />}
+                        <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${payoutMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                          {payoutMessage.type === "success" ? <ShieldCheck className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                           {payoutMessage.text}
                         </div>
                       )}
                       <Button type="submit" disabled={isSavingPayout} className="w-full mt-2">
-                        {isSavingPayout
-                          ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          : <Save className="h-4 w-4 mr-2" />}
+                        {isSavingPayout ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                         {hasPayoutMethod ? "Actualizar datos" : "Guardar datos"}
                       </Button>
                     </form>
