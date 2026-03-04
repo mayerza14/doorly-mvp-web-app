@@ -30,7 +30,6 @@ export default function BuscarPage() {
   const [listings, setListings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Filters state
   const [zona, setZona] = useState("");
   const [tipo, setTipo] = useState("todos");
   const [precioMax, setPrecioMax] = useState(10000);
@@ -38,99 +37,94 @@ export default function BuscarPage() {
   const [acceso24, setAcceso24] = useState(false);
   const [fitsSeleccionados, setFitsSeleccionados] = useState<string[]>([]);
 
-  // Traer listings reales de Supabase al cargar
   useEffect(() => {
     const fetchListings = async () => {
       setIsLoading(true);
-      const { data, error } = await supabase.functions.invoke('search-listings', {
-        method: 'GET',
+
+      // 1. Traer listings desde la edge function
+      const { data, error } = await supabase.functions.invoke("search-listings", {
+        method: "GET",
       });
-      if (!error && data?.listings) {
-  const normalized = data.listings.map((l: any) => ({
-    ...l,
-    priceDaily: l.price_daily,
-    areaLabel: l.area_label,
-    spaceType: l.space_type,
-    sizeM2: l.size_m2,
-    accessType: l.access_type,
-    hostId: l.host_id,
-    latPublic: l.lat_public,
-    lngPublic: l.lng_public,
-    createdAt: l.created_at,
-  }));
-  setListings(normalized);
-}
+
+      if (error || !data?.listings) {
+        setIsLoading(false);
+        return;
+      }
+
+      const raw = data.listings;
+
+      // 2. Traer fotos de todos los listings en una sola query
+      const ids = raw.map((l: any) => l.id);
+      const { data: photosData } = await supabase
+        .from("listing_photos")
+        .select("listing_id, url, position")
+        .in("listing_id", ids)
+        .order("position", { ascending: true });
+
+      // 3. Agrupar fotos por listing_id
+      const photosByListing: Record<string, string[]> = {};
+      for (const p of photosData || []) {
+        if (!photosByListing[p.listing_id]) photosByListing[p.listing_id] = [];
+        photosByListing[p.listing_id].push(p.url);
+      }
+
+      // 4. Normalizar y adjuntar fotos
+      const normalized = raw.map((l: any) => ({
+        ...l,
+        priceDaily: l.price_daily,
+        priceWeekly: l.price_weekly ?? null,
+        areaLabel: l.area_label,
+        spaceType: l.space_type,
+        sizeM2: l.size_m2,
+        accessType: l.access_type,
+        hostId: l.host_id,
+        latPublic: l.lat_public,
+        lngPublic: l.lng_public,
+        createdAt: l.created_at,
+        fits: l.fits || [],
+        // Fotos: primero listing_photos, fallback a columna photos del listing
+        photos:
+          photosByListing[l.id]?.length > 0
+            ? photosByListing[l.id]
+            : l.photos || l.photo_urls || [],
+      }));
+
+      setListings(normalized);
       setIsLoading(false);
     };
+
     fetchListings();
   }, []);
 
   const filteredListings = useMemo(() => {
     let results = listings.filter((listing) => {
-      // Search query (usa snake_case)
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         if (
           !listing.title?.toLowerCase().includes(query) &&
           !listing.area_label?.toLowerCase().includes(query) &&
           !listing.description?.toLowerCase().includes(query)
-        ) {
-          return false;
-        }
+        ) return false;
       }
-
-      // Zona filter
-      if (zona && !listing.area_label?.toLowerCase().includes(zona.toLowerCase())) {
-        return false;
-      }
-
-      // Tipo filter
-      if (tipo !== "todos" && listing.space_type?.toLowerCase() !== tipo.toLowerCase()) {
-        return false;
-      }
-
-      // Price filter
-      if (listing.price_daily > precioMax) {
-        return false;
-      }
-
-      // Size filter
-      if (tamanoMin > 0 && (listing.size_m2 ?? 0) < tamanoMin) {
-        return false;
-      }
-
-      // Access 24/7 filter
-      if (acceso24 && listing.access_type !== "24_7") {
-        return false;
-      }
-
-      // Fits filter
+      if (zona && !listing.area_label?.toLowerCase().includes(zona.toLowerCase())) return false;
+      if (tipo !== "todos" && listing.space_type?.toLowerCase() !== tipo.toLowerCase()) return false;
+      if (listing.price_daily > precioMax) return false;
+      if (tamanoMin > 0 && (listing.size_m2 ?? 0) < tamanoMin) return false;
+      if (acceso24 && listing.access_type !== "24_7") return false;
       if (fitsSeleccionados.length > 0) {
         const fits = listing.fits ?? [];
         const hasMatch = fitsSeleccionados.some((fit) =>
-          fits.some((listingFit: string) =>
-            listingFit.toLowerCase().includes(fit.toLowerCase())
-          )
+          fits.some((lf: string) => lf.toLowerCase().includes(fit.toLowerCase()))
         );
         if (!hasMatch) return false;
       }
-
       return true;
     });
 
     switch (sortBy) {
-      case "price-low":
-        results.sort((a, b) => a.price_daily - b.price_daily);
-        break;
-      case "price-high":
-        results.sort((a, b) => b.price_daily - a.price_daily);
-        break;
-      case "newest":
-      default:
-        results.sort((a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-        break;
+      case "price-low": results.sort((a, b) => a.price_daily - b.price_daily); break;
+      case "price-high": results.sort((a, b) => b.price_daily - a.price_daily); break;
+      default: results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
 
     return results;
@@ -172,16 +166,14 @@ export default function BuscarPage() {
                 size="sm"
                 onClick={() => setViewMode("list")}
               >
-                <List className="h-4 w-4 mr-1" />
-                Lista
+                <List className="h-4 w-4 mr-1" />Lista
               </Button>
               <Button
                 variant={viewMode === "map" ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => setViewMode("map")}
               >
-                <Map className="h-4 w-4 mr-1" />
-                Mapa
+                <Map className="h-4 w-4 mr-1" />Mapa
               </Button>
             </div>
 
