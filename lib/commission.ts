@@ -15,7 +15,9 @@ export const COMMISSION_HOST_RATE = 0.05; // 5%
 
 // Comisión que cobra MercadoPago sobre el total cobrado al inquilino
 // Checkout Pro Argentina — puede variar levemente según medio de pago
-export const MP_FEE_RATE = 0.0761; // 7,61%
+export const MP_FEE_RATE = 0.0761;      // 7,61% comisión MP
+export const MP_SIRTAC_RATE = 0.015;    // 1,5% retención SIRTAC CABA
+export const MP_TOTAL_RATE = MP_FEE_RATE + MP_SIRTAC_RATE; // 9,11% total
 
 /**
  * Comisión que paga el inquilino (se suma al precio base).
@@ -56,7 +58,17 @@ export function calcHostPayout(basePrice: number): number {
  * Se descuenta antes de que el dinero llegue a la cuenta de Doorly.
  */
 export function calcMpFee(chargedAmount: number): number {
-  return Math.round(chargedAmount * MP_FEE_RATE);
+  const mpFee = Math.round(chargedAmount * MP_FEE_RATE);
+  const sirtac = Math.round(chargedAmount * MP_SIRTAC_RATE);
+  return mpFee + sirtac;
+}
+
+export function calcMpFeeBreakdown(chargedAmount: number) {
+  return {
+    mpFee: Math.round(chargedAmount * MP_FEE_RATE),
+    sirtac: Math.round(chargedAmount * MP_SIRTAC_RATE),
+    total: Math.round(chargedAmount * MP_TOTAL_RATE),
+  };
 }
 
 /**

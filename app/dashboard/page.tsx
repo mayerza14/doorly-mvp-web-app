@@ -30,7 +30,7 @@ import { LeaveReview } from "@/components/leave-review";
 import { CertificationRequestModal } from "@/components/certification-request-modal";
 import { DoorlyCertifiedBadge } from "@/components/doorly-certified-badge";
 import { PendingQuestionsBadge } from "@/components/pending-questions-badge";
-import { calcHostBreakdown, DOORLY_COMMISSION_ENABLED } from "@/lib/commission";
+import { calcHostBreakdown, calcMpFeeBreakdown, DOORLY_COMMISSION_ENABLED } from "@/lib/commission";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PaymentVerifier — separado para poder usar useSearchParams en Suspense
@@ -130,6 +130,7 @@ export default function DashboardPage() {
   // Reservas recibidas en los espacios del usuario como host
   const [hostBookings, setHostBookings] = useState<any[]>([]);
   const [isLoadingHostBookings, setIsLoadingHostBookings] = useState(true);
+  const [openBreakdownId, setOpenBreakdownId] = useState<string | null>(null);
 
   // Chat
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
@@ -670,73 +671,92 @@ export default function DashboardPage() {
                             </div>
 
                             {/* Desglose financiero — solo reservas confirmadas */}
-                            {isConfirmed ? (
-                              <div className="bg-white rounded-lg border border-green-100 p-3 space-y-2">
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                                  Desglose del pago
-                                </p>
+                            {isConfirmed && (
+  <button
+    onClick={() =>
+      setOpenBreakdownId(
+        openBreakdownId === booking.id ? null : booking.id
+      )
+    }
+    className="w-full flex items-center justify-between text-sm text-primary hover:text-primary/80 transition-colors py-1"
+  >
+    <span className="font-medium">Ver desglose del pago</span>
+    <span className={`transition-transform duration-200 ${openBreakdownId === booking.id ? "rotate-180" : ""}`}>
+      ▾
+    </span>
+  </button>
+)}
 
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-muted-foreground">Total cobrado al guardador</span>
-                                  <span className="font-medium">${breakdown.totalCharged.toLocaleString("es-AR")}</span>
-                                </div>
+{isConfirmed && openBreakdownId === booking.id && (() => {
+  const fees = calcMpFeeBreakdown(breakdown.totalCharged);
+  return (
+    <div className="bg-white rounded-lg border border-green-100 p-3 space-y-2 mt-1">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+        Desglose del pago
+      </p>
 
-                                <div className="flex justify-between text-sm">
-                                  <span className="flex items-center gap-1.5 text-muted-foreground">
-                                    Comisión MercadoPago (~7,61%)
-                                    <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
-                                      descontada por MP
-                                    </span>
-                                  </span>
-                                  <span className="text-red-500 font-medium">
-                                    -${breakdown.mpFee.toLocaleString("es-AR")}
-                                  </span>
-                                </div>
+      <div className="flex justify-between text-sm">
+        <span className="text-muted-foreground">Total cobrado al guardador</span>
+        <span className="font-medium">${breakdown.totalCharged.toLocaleString("es-AR")}</span>
+      </div>
 
-                                <div className="flex justify-between text-sm">
-                                  <span className="flex items-center gap-1.5 text-muted-foreground">
-                                    Comisión Doorly
-                                    {!DOORLY_COMMISSION_ENABLED && (
-                                      <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold uppercase">
-                                        Promo Lanzamiento
-                                      </span>
-                                    )}
-                                  </span>
-                                  {DOORLY_COMMISSION_ENABLED ? (
-                                    <span className="text-red-500 font-medium">
-                                      -${breakdown.doorlyCommission.toLocaleString("es-AR")}
-                                    </span>
-                                  ) : (
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="line-through text-muted-foreground text-xs">
-                                        -${Math.round(basePrice * 0.05).toLocaleString("es-AR")}
-                                      </span>
-                                      <span className="text-green-600 font-bold text-sm">$0</span>
-                                    </div>
-                                  )}
-                                </div>
+      <div className="flex justify-between text-sm">
+        <span className="text-muted-foreground">Comisión MercadoPago (7,61%)</span>
+        <span className="text-red-500 font-medium">-${fees.mpFee.toLocaleString("es-AR")}</span>
+      </div>
 
-                                <div className="border-t border-dashed border-green-200 pt-2 mt-1">
-                                  <div className="flex justify-between items-center">
-                                    <span className="font-bold text-sm">Recibís (transferencia Doorly)</span>
-                                    <span className="text-lg font-black text-green-700">
-                                      ${breakdown.hostPayout.toLocaleString("es-AR")}
-                                    </span>
-                                  </div>
-                                  <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
-                                    * Puede variar levemente por retenciones según la provincia del pagador.
-                                  </p>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex justify-between text-sm text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
-                                <span>Precio base</span>
-                                <span className="font-medium">${basePrice.toLocaleString("es-AR")}</span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+      <div className="flex justify-between text-sm">
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          Retención SIRTAC CABA (1,5%)
+          <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+            automática
+          </span>
+        </span>
+        <span className="text-red-500 font-medium">-${fees.sirtac.toLocaleString("es-AR")}</span>
+      </div>
+
+      <div className="flex justify-between text-sm border-t pt-2">
+        <span className="text-muted-foreground">Total descuentos MP</span>
+        <span className="text-red-500 font-medium">-${fees.total.toLocaleString("es-AR")}</span>
+      </div>
+
+      <div className="flex justify-between text-sm">
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          Comisión Doorly
+          {!DOORLY_COMMISSION_ENABLED && (
+            <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold uppercase">
+              Promo Lanzamiento
+            </span>
+          )}
+        </span>
+        {DOORLY_COMMISSION_ENABLED ? (
+          <span className="text-red-500 font-medium">
+            -${breakdown.doorlyCommission.toLocaleString("es-AR")}
+          </span>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <span className="line-through text-muted-foreground text-xs">
+              -${Math.round(breakdown.totalCharged * 0.05).toLocaleString("es-AR")}
+            </span>
+            <span className="text-green-600 font-bold text-sm">$0</span>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-dashed border-green-200 pt-2 mt-1">
+        <div className="flex justify-between items-center">
+          <span className="font-bold text-sm">Recibís (transferencia Doorly)</span>
+          <span className="text-lg font-black text-green-700">
+            ${breakdown.hostPayout.toLocaleString("es-AR")}
+          </span>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
+          * SIRTAC aplica por ser receptor en CABA. MP lo descuenta automáticamente.
+        </p>
+      </div>
+    </div>
+  );
+})()}
                     </div>
                   )}
                 </CardContent>
