@@ -619,150 +619,158 @@ export default function DashboardPage() {
           )}
 
           {/* ══ TAB: RESERVAS RECIBIDAS (HOST) ══ */}
-          {isHost && (
-            <TabsContent value="recibidas" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Reservas recibidas</CardTitle>
-                  <CardDescription>
-                    Reservas hechas en tus espacios y el desglose financiero de cada una
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingHostBookings ? (
-                    <div className="flex items-center justify-center py-12">
-                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : hostBookings.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Banknote className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-30" />
-                      <p className="text-muted-foreground">Todavía no recibiste ninguna reserva</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {hostBookings.map((booking) => {
-                        const totalCharged = Number(booking.total_amount ?? booking.amount ?? 0);
-                        const basePrice = Number(booking.amount ?? 0);
-                        const breakdown = calcHostBreakdown(totalCharged, basePrice);
-                        const isConfirmed =
-                          booking.status === "confirmed" && booking.mp_status === "approved";
-
-                        return (
-                          <div
-                            key={booking.id}
-                            className={`rounded-xl border p-4 space-y-3 ${
-                              isConfirmed
-                                ? "border-green-200 bg-green-50/30"
-                                : "border-border bg-card"
-                            }`}
-                          >
-                            {/* Encabezado */}
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="font-semibold text-sm">{booking.listing?.title || "Espacio"}</p>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  {new Date(booking.start_date).toLocaleDateString("es-AR")}
-                                  {booking.start_date !== booking.end_date && (
-                                    <> → {new Date(booking.end_date).toLocaleDateString("es-AR")}</>
-                                  )}
-                                </p>
-                              </div>
-                              {getStatusBadge(booking.status)}
-                            </div>
-
-                            {/* Desglose financiero — solo reservas confirmadas */}
-                            {isConfirmed && (
-  <button
-    onClick={() =>
-      setOpenBreakdownId(
-        openBreakdownId === booking.id ? null : booking.id
-      )
-    }
-    className="w-full flex items-center justify-between text-sm text-primary hover:text-primary/80 transition-colors py-1"
-  >
-    <span className="font-medium">Ver desglose del pago</span>
-    <span className={`transition-transform duration-200 ${openBreakdownId === booking.id ? "rotate-180" : ""}`}>
-      ▾
-    </span>
-  </button>
-)}
-
-{isConfirmed && openBreakdownId === booking.id && (() => {
-  const fees = calcMpFeeBreakdown(breakdown.totalCharged);
-  return (
-    <div className="bg-white rounded-lg border border-green-100 p-3 space-y-2 mt-1">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-        Desglose del pago
-      </p>
-
-      <div className="flex justify-between text-sm">
-        <span className="text-muted-foreground">Total cobrado al guardador</span>
-        <span className="font-medium">${breakdown.totalCharged.toLocaleString("es-AR")}</span>
-      </div>
-
-      <div className="flex justify-between text-sm">
-        <span className="text-muted-foreground">Comisión MercadoPago (7,61%)</span>
-        <span className="text-red-500 font-medium">-${fees.mpFee.toLocaleString("es-AR")}</span>
-      </div>
-
-      <div className="flex justify-between text-sm">
-        <span className="flex items-center gap-1.5 text-muted-foreground">
-          Retención SIRTAC CABA (1,5%)
-          <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
-            automática
-          </span>
-        </span>
-        <span className="text-red-500 font-medium">-${fees.sirtac.toLocaleString("es-AR")}</span>
-      </div>
-
-      <div className="flex justify-between text-sm border-t pt-2">
-        <span className="text-muted-foreground">Total descuentos MP</span>
-        <span className="text-red-500 font-medium">-${fees.total.toLocaleString("es-AR")}</span>
-      </div>
-
-      <div className="flex justify-between text-sm">
-        <span className="flex items-center gap-1.5 text-muted-foreground">
-          Comisión Doorly
-          {!DOORLY_COMMISSION_ENABLED && (
-            <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold uppercase">
-              Promo Lanzamiento
-            </span>
-          )}
-        </span>
-        {DOORLY_COMMISSION_ENABLED ? (
-          <span className="text-red-500 font-medium">
-            -${breakdown.doorlyCommission.toLocaleString("es-AR")}
-          </span>
-        ) : (
-          <div className="flex items-center gap-1.5">
-            <span className="line-through text-muted-foreground text-xs">
-              -${Math.round(breakdown.totalCharged * 0.05).toLocaleString("es-AR")}
-            </span>
-            <span className="text-green-600 font-bold text-sm">$0</span>
+{isHost && (
+  <TabsContent value="recibidas" className="space-y-6">
+    <Card>
+      <CardHeader>
+        <CardTitle>Reservas recibidas</CardTitle>
+        <CardDescription>
+          Reservas hechas en tus espacios y el desglose financiero de cada una
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoadingHostBookings ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        )}
-      </div>
+        ) : hostBookings.length === 0 ? (
+          <div className="text-center py-12">
+            <Banknote className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-30" />
+            <p className="text-muted-foreground">Todavía no recibiste ninguna reserva</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {hostBookings.map((booking) => {
+              const totalCharged = Number(booking.total_amount ?? booking.amount ?? 0);
+              const basePrice = Number(booking.amount ?? 0);
+              const breakdown = calcHostBreakdown(totalCharged, basePrice);
+              const fees = calcMpFeeBreakdown(totalCharged);
+              const isConfirmed =
+                booking.status === "confirmed" && booking.mp_status === "approved";
+              const isOpen = openBreakdownId === booking.id;
 
-      <div className="border-t border-dashed border-green-200 pt-2 mt-1">
-        <div className="flex justify-between items-center">
-          <span className="font-bold text-sm">Recibís (transferencia Doorly)</span>
-          <span className="text-lg font-black text-green-700">
-            ${breakdown.hostPayout.toLocaleString("es-AR")}
-          </span>
-        </div>
-        <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
-          * SIRTAC aplica por ser receptor en CABA. MP lo descuenta automáticamente.
-        </p>
-      </div>
-    </div>
-  );
-})()}
+              return (
+                <div
+                  key={booking.id}
+                  className={`rounded-xl border p-4 space-y-3 ${
+                    isConfirmed ? "border-green-200 bg-green-50/30" : "border-border bg-card"
+                  }`}
+                >
+                  {/* Encabezado */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-sm">{booking.listing?.title || "Espacio"}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {new Date(booking.start_date).toLocaleDateString("es-AR")}
+                        {booking.start_date !== booking.end_date && (
+                          <> → {new Date(booking.end_date).toLocaleDateString("es-AR")}</>
+                        )}
+                      </p>
+                    </div>
+                    {getStatusBadge(booking.status)}
+                  </div>
+
+                  {/* Botón colapsable — solo confirmadas */}
+                  {isConfirmed && (
+                    <button
+                      onClick={() => setOpenBreakdownId(isOpen ? null : booking.id)}
+                      className="w-full flex items-center justify-between text-sm text-primary hover:text-primary/80 transition-colors py-1"
+                    >
+                      <span className="font-medium">Ver desglose del pago</span>
+                      <span
+                        className="inline-block transition-transform duration-200"
+                        style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                      >
+                        ▾
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Desglose expandido */}
+                  {isConfirmed && isOpen && (
+                    <div className="bg-white rounded-lg border border-green-100 p-3 space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Desglose del pago
+                      </p>
+
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total cobrado al guardador</span>
+                        <span className="font-medium">${breakdown.totalCharged.toLocaleString("es-AR")}</span>
+                      </div>
+
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Comisión MercadoPago (7,61%)</span>
+                        <span className="text-red-500 font-medium">-${fees.mpFee.toLocaleString("es-AR")}</span>
+                      </div>
+
+                      <div className="flex justify-between text-sm">
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          Retención SIRTAC CABA (1,5%)
+                          <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                            automática
+                          </span>
+                        </span>
+                        <span className="text-red-500 font-medium">-${fees.sirtac.toLocaleString("es-AR")}</span>
+                      </div>
+
+                      <div className="flex justify-between text-sm border-t pt-2">
+                        <span className="text-muted-foreground font-medium">Total descuentos MP</span>
+                        <span className="text-red-500 font-medium">-${fees.total.toLocaleString("es-AR")}</span>
+                      </div>
+
+                      <div className="flex justify-between text-sm">
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          Comisión Doorly
+                          {!DOORLY_COMMISSION_ENABLED && (
+                            <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold uppercase">
+                              Promo Lanzamiento
+                            </span>
+                          )}
+                        </span>
+                        {DOORLY_COMMISSION_ENABLED ? (
+                          <span className="text-red-500 font-medium">
+                            -${breakdown.doorlyCommission.toLocaleString("es-AR")}
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <span className="line-through text-muted-foreground text-xs">
+                              -${Math.round(basePrice * 0.05).toLocaleString("es-AR")}
+                            </span>
+                            <span className="text-green-600 font-bold text-sm">$0</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="border-t border-dashed border-green-200 pt-2 mt-1">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-sm">Recibís (transferencia Doorly)</span>
+                          <span className="text-lg font-black text-green-700">
+                            ${breakdown.hostPayout.toLocaleString("es-AR")}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
+                          * SIRTAC aplica por ser receptor en CABA. MP lo descuenta automáticamente.
+                        </p>
+                      </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
+
+                  {/* No confirmadas — solo precio base */}
+                  {!isConfirmed && (
+                    <div className="flex justify-between text-sm text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
+                      <span>Precio base</span>
+                      <span className="font-medium">${basePrice.toLocaleString("es-AR")}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  </TabsContent>
+)}
 
           {/* ══ TAB: MIS RESERVAS (INQUILINO) ══ */}
           {isRenter && (
