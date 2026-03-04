@@ -65,14 +65,8 @@ export default async function EspacioDetailPage({
   if (bookingsError) console.error("Error leyendo reservas:", bookingsError);
 
   // Verificar si el host tiene datos bancarios cargados
-  const { data: hostPayoutData } = await supabase
-  .from("payout_methods")
-  .select("id")
-  .eq("profile_id", rawListing.host_id)
-  .maybeSingle()
-  .then((res) => res); // fuerza re-evaluación
-
-const hostHasPayoutMethod = !!hostPayoutData;
+  const { data: hostHasPayoutMethod } = await supabase
+  .rpc("has_payout_method", { uid: rawListing.host_id });
 
   const blockedDates = (bookingsData || []).map((b) => ({
     listingId: id,
