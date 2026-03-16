@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import type { Listing, AvailabilityBlock } from "@/lib/types";
 import { type DateRange } from "react-day-picker";
-import { CalendarIcon, Loader2, Info, AlertTriangle, Camera } from "lucide-react";
+import { CalendarIcon, Loader2, AlertTriangle, Camera } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "@/lib/supabaseClient";
@@ -283,13 +283,6 @@ export function BookingWidget({
                 <span className="text-2xl font-black text-primary">
                   ${priceInfo.renterTotal.toLocaleString()}
                 </span>
-              </div>
- 
-              <div className="flex items-start gap-2 bg-blue-50/50 p-2 rounded-md border border-blue-100">
-                <Info className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
-                <p className="text-[10px] text-blue-700 leading-tight">
-                  No hay cargos adicionales. El precio final es el reflejado arriba.
-                </p>
               </div>
             </div>
           )}
