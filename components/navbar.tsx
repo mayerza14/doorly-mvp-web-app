@@ -1,5 +1,5 @@
 "use client";
-
+ 
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -15,11 +15,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth-context";
-
+ 
 export function Navbar() {
   const { user, profile, logout } = useAuth();
   const pathname = usePathname();
-
+ 
   const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, hash: string) => {
     if (pathname === "/") {
       e.preventDefault();
@@ -29,14 +29,16 @@ export function Navbar() {
       }
     }
   };
-
+ 
   return (
     <header suppressHydrationWarning className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <nav className="container flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center space-x-2">
-          <div className="text-2xl font-bold text-primary"><Image src="/logo.png" alt="Doorly" width={90} height={36} className="object-contain" /></div>
+          <div className="text-2xl font-bold text-primary">
+            <Image src="/logo.png" alt="Doorly" width={90} height={36} className="object-contain" />
+          </div>
         </Link>
-
+ 
         {/* Desktop Navigation */}
         <div className="hidden md:flex md:items-center md:gap-6">
           <Link href="/buscar" className="text-sm font-medium text-foreground transition-colors hover:text-primary">
@@ -52,7 +54,7 @@ export function Navbar() {
             Contacto
           </Link>
         </div>
-
+ 
         {/* Desktop Right Side */}
         <div className="flex items-center gap-2">
           {user ? (
@@ -104,7 +106,7 @@ export function Navbar() {
               </Button>
             </>
           )}
-
+ 
           {/* Mobile Menu */}
           <Sheet>
             <SheetTrigger asChild className="md:hidden">
@@ -115,6 +117,7 @@ export function Navbar() {
             </SheetTrigger>
             <SheetContent side="right">
               <div className="flex flex-col gap-4 mt-8">
+                {/* Links de navegación */}
                 <Link href="/buscar" className="text-base font-medium text-foreground transition-colors hover:text-primary">
                   Buscar
                 </Link>
@@ -127,16 +130,22 @@ export function Navbar() {
                 <Link href="/#contacto" onClick={(e) => handleAnchorClick(e, "#contacto")} className="text-base font-medium text-muted-foreground transition-colors hover:text-foreground">
                   Contacto
                 </Link>
+ 
+                {/* Separador visual */}
+                <div className="border-t border-border my-1" />
+ 
                 {user ? (
                   <>
-                    <Button asChild variant="default" className="justify-start">
+                    {/* CTA Publicar — destacado en mobile */}
+                    <Button asChild variant="default" className="w-full justify-center">
                       <Link href="/publicar">
                         <Plus className="h-4 w-4 mr-2" />
-                        Publicar
+                        Publicar espacio
                       </Link>
                     </Button>
                     <Button asChild variant="ghost" className="justify-start">
-                      <Link href="/dashboard">Mi pefil</Link>
+                      {/* FIXED: era "Mi pefil" */}
+                      <Link href="/dashboard">Mi perfil</Link>
                     </Button>
                     {profile?.role === "admin" && (
                       <Button asChild variant="ghost" className="justify-start">
@@ -153,10 +162,11 @@ export function Navbar() {
                   </>
                 ) : (
                   <>
-                    <Button asChild variant="default" className="justify-start">
+                    {/* CTA Publicar — destacado en mobile para anónimos */}
+                    <Button asChild variant="default" className="w-full justify-center">
                       <Link href="/publicar">Publicar espacio</Link>
                     </Button>
-                    <Button asChild variant="outline" className="justify-start bg-transparent">
+                    <Button asChild variant="outline" className="w-full justify-center bg-transparent">
                       <Link href="/auth">Iniciar sesión</Link>
                     </Button>
                   </>

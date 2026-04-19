@@ -10,11 +10,9 @@ import {
 } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, CheckCircle, Shield, Lock, Star, Upload, FileText, MapPin, DollarSign, MessageSquare, Eye, Sparkles } from "lucide-react";
-import { HeroSearchBar } from "@/components/hero-search-bar";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { HeroCTAs } from "@/components/hero-ctas";
 import { ContactForm } from "@/components/contact-form";
-
+ 
 export default function HomePage() {
   return (
     <AppShell>
@@ -29,13 +27,12 @@ export default function HomePage() {
               Encontrá el lugar perfecto para guardar tus cosas o estacionar tu
               vehículo. Seguro, confiable y cerca de donde lo necesitás.
             </p>
-            <div className="mt-10 max-w-md mx-auto">
-              <HeroSearchBar />
-            </div>
+            {/* CTAs con modal de intención para "Publicar" */}
+            <HeroCTAs />
           </div>
         </div>
       </section>
-
+ 
       {/* Cómo Funciona Section */}
       <section className="py-16 md:py-24">
         <div className="container px-4">
@@ -44,7 +41,7 @@ export default function HomePage() {
               ¿Cómo funciona?
             </h2>
           </div>
-
+ 
           {/* Mobile: Tabs */}
           <div className="mt-12 md:hidden">
             <Tabs defaultValue="inquilinos" className="w-full">
@@ -142,7 +139,7 @@ export default function HomePage() {
               </TabsContent>
             </Tabs>
           </div>
-
+ 
           {/* Desktop: Side by side */}
           <div className="mt-16 hidden md:grid md:grid-cols-2 md:gap-12">
             <div>
@@ -190,7 +187,7 @@ export default function HomePage() {
                 </Card>
               </div>
             </div>
-
+ 
             <div>
               <h3 className="text-xl font-bold text-foreground mb-2">Para propietarios</h3>
               <p className="text-sm text-muted-foreground mb-6">Convertí tu espacio libre en ingresos</p>
@@ -204,7 +201,7 @@ export default function HomePage() {
                       1. Contanos de tu espacio
                     </h4>
                     <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                      Completá el formulario con fotos y detalles de tu espacio.                   
+                      Completá el formulario con fotos y detalles de tu espacio.
                     </p>
                   </CardContent>
                 </Card>
@@ -239,7 +236,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
+ 
       {/* ¿Por qué elegir Doorly? Section */}
       <section className="py-16 md:py-24">
         <div className="container px-4">
@@ -248,7 +245,7 @@ export default function HomePage() {
               ¿Por qué elegir Doorly?
             </h2>
           </div>
-
+ 
           <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
             <Card className="border-2">
               <CardContent className="pt-6">
@@ -263,7 +260,7 @@ export default function HomePage() {
                 </p>
               </CardContent>
             </Card>
-
+ 
             <Card className="border-2">
               <CardContent className="pt-6">
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
@@ -277,7 +274,7 @@ export default function HomePage() {
                 </p>
               </CardContent>
             </Card>
-
+ 
             <Card className="border-2">
               <CardContent className="pt-6">
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
@@ -291,7 +288,7 @@ export default function HomePage() {
                 </p>
               </CardContent>
             </Card>
-
+ 
             <Card className="border-2">
               <CardContent className="pt-6">
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
@@ -308,7 +305,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
+ 
       {/* Tu seguridad es nuestra prioridad Section */}
       <section className="bg-muted/30 py-16 md:py-24">
         <div className="container px-4">
@@ -317,7 +314,7 @@ export default function HomePage() {
               Tu seguridad es nuestra prioridad
             </h2>
           </div>
-
+ 
           <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
             <Card className="border-2 bg-background">
               <CardContent className="pt-6">
@@ -332,7 +329,7 @@ export default function HomePage() {
                 </p>
               </CardContent>
             </Card>
-
+ 
             <Card className="border-2 bg-background">
               <CardContent className="pt-6">
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
@@ -346,7 +343,7 @@ export default function HomePage() {
                 </p>
               </CardContent>
             </Card>
-
+ 
             <Card className="border-2 bg-background">
               <CardContent className="pt-6">
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
@@ -360,7 +357,7 @@ export default function HomePage() {
                 </p>
               </CardContent>
             </Card>
-
+ 
             <Card className="border-2 bg-background">
               <CardContent className="pt-6">
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
@@ -377,7 +374,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
+ 
       {/* Quiénes somos Section */}
       <section id="quienes-somos" className="py-16 md:py-24">
         <div className="container px-4">
@@ -396,8 +393,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-      
- {/* Contacto Section */}
+ 
+      {/* Contacto Section */}
       <section id="contacto" className="py-16 md:py-24">
         <div className="container px-4">
           <div className="mx-auto max-w-xl">
@@ -423,8 +420,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* CTA Section */}
+ 
+      {/* CTA Section — FIXED: era Button > div (HTML inválido) */}
       <section className="bg-primary py-16 text-primary-foreground">
         <div className="container px-4">
           <div className="mx-auto max-w-3xl text-center">
@@ -432,17 +429,22 @@ export default function HomePage() {
               ¿Listo para encontrar tu espacio ideal?
             </h2>
             <p className="mt-4 text-lg text-primary-foreground/90 text-pretty">
-              Comenzá a buscar ahora y encontrá el lugar perfecto para tus
-              necesidades.
+              Comenzá a buscar ahora y encontrá el lugar perfecto para tus necesidades.
             </p>
-            <Button
-              asChild
-              size="lg"
-              variant="secondary"
-              className="mt-8 text-base"
-            >
-              <Link href="/buscar">Explorar espacios</Link>
-            </Button>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Link
+                href="/buscar"
+                className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-slate-100"
+              >
+                Buscar espacio
+              </Link>
+              <Link
+                href="/publicar"
+                className="inline-flex items-center justify-center rounded-full border border-white/30 bg-white/10 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/20"
+              >
+                Publicar espacio
+              </Link>
+            </div>
           </div>
         </div>
       </section>
