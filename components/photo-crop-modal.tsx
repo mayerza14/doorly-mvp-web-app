@@ -11,7 +11,7 @@ interface PhotoCropModalProps {
   onCancel: () => void;
 }
 
-const ASPECT = 16 / 9;
+const ASPECT = 4 / 3;
 
 export function PhotoCropModal({ file, onConfirm, onCancel }: PhotoCropModalProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -180,8 +180,8 @@ export function PhotoCropModal({ file, onConfirm, onCancel }: PhotoCropModalProp
         </DialogHeader>
 
         <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
-          <div className="w-8 h-[18px] bg-primary/30 rounded-sm border border-primary/40" />
-          <p className="text-xs text-primary font-medium">Formato 16:9 — igual al carousel de la publicación</p>
+          <div className="w-8 h-6 bg-primary/30 rounded-sm border border-primary/40" />
+<p className="text-xs text-primary font-medium">Formato 4:3 — igual al carousel de la publicación</p>
         </div>
 
         <div ref={containerRef} className="flex justify-center bg-black rounded-xl overflow-hidden">
