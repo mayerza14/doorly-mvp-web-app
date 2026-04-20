@@ -359,9 +359,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Calcular cantidad de tabs para el grid
-  const tabCount = [isHost, isHost, isRenter, true, true].filter(Boolean).length;
-
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <AppShell>
@@ -416,17 +413,13 @@ export default function DashboardPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList
-            className="grid w-full h-auto p-1"
-            style={{ gridTemplateColumns: `repeat(${tabCount}, minmax(0, 1fr))` }}
-          >
-            {isHost && <TabsTrigger value="espacios" className="py-2 text-xs sm:text-sm">Mis espacios</TabsTrigger>}
-            {isHost && <TabsTrigger value="recibidas" className="py-2 text-xs sm:text-sm">Reservas recibidas</TabsTrigger>}
-            {isRenter && <TabsTrigger value="reservas" className="py-2 text-xs sm:text-sm">Mis reservas</TabsTrigger>}
-            <TabsTrigger value="mensajes" className="py-2 text-xs sm:text-sm">Mensajes</TabsTrigger>
-            <TabsTrigger value="perfil" className="py-2 text-xs sm:text-sm">Mi perfil</TabsTrigger>
-          </TabsList>
-
+          <TabsList className="flex w-full h-auto p-1 overflow-x-auto gap-1 flex-nowrap">
+  {isHost && <TabsTrigger value="espacios" className="py-2 text-xs sm:text-sm whitespace-nowrap shrink-0">Mis espacios</TabsTrigger>}
+  {isHost && <TabsTrigger value="recibidas" className="py-2 text-xs sm:text-sm whitespace-nowrap shrink-0">Reservas recibidas</TabsTrigger>}
+  {isRenter && <TabsTrigger value="reservas" className="py-2 text-xs sm:text-sm whitespace-nowrap shrink-0">Mis reservas</TabsTrigger>}
+  <TabsTrigger value="mensajes" className="py-2 text-xs sm:text-sm whitespace-nowrap shrink-0">Mensajes</TabsTrigger>
+  <TabsTrigger value="perfil" className="py-2 text-xs sm:text-sm whitespace-nowrap shrink-0">Mi perfil</TabsTrigger>
+</TabsList>
           {/* ══ TAB: MIS ESPACIOS ══ */}
           {isHost && (
             <TabsContent value="espacios" className="space-y-6">
