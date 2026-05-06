@@ -267,7 +267,7 @@ function PublishFormContent() {
       if (formData.fits.length === 0) newErrors.fits = "Seleccioná al menos una opción de qué entra";
     }
     if (step === 2) {
-      if (formData.photos.length < 3) newErrors.photos = "Subí al menos 3 fotos";
+      if (formData.photos.length < 2) newErrors.photos = "Subí al menos 2 fotos";
     }
     if (step === 3) {
       if (!formData.priceDaily || formData.priceDaily <= 0) newErrors.priceDaily = "El precio diario es requerido";
@@ -593,7 +593,7 @@ function PublishFormContent() {
               <>
                 <div className="space-y-3">
                   <div>
-                    <Label>Fotos del espacio * (mínimo 3, máximo 10)</Label>
+                    <Label>Fotos del espacio * (mínimo 2, máximo 10)</Label>
                     <p className="text-xs text-muted-foreground mt-1">Subí fotos claras y bien iluminadas. Los espacios con buenas fotos reciben hasta 3x más reservas.</p>
                   </div>
 
@@ -635,7 +635,7 @@ function PublishFormContent() {
                       <p className="text-xs font-medium text-muted-foreground">{formData.photos.length}/10 fotos cargadas</p>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                         {formData.photos.map((url, idx) => (
-                          <div key={idx} className="relative rounded-lg overflow-hidden border border-border bg-muted" style={{ aspectRatio: "16/9" }}>
+                          <div key={idx} className="relative rounded-lg overflow-hidden border border-border bg-muted" style={{ aspectRatio: "4/3" }}>
                             <img src={url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
                             {idx === 0 && <div className="absolute top-1.5 left-1.5 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded">Principal</div>}
                             <button type="button" onClick={() => updateFormData("photos", formData.photos.filter((_, i) => i !== idx))} className="absolute top-1.5 right-1.5 h-7 w-7 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-red-600 active:bg-red-700 transition-colors" aria-label="Eliminar foto">

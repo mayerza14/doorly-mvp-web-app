@@ -81,7 +81,7 @@ export function PhotoCropModal({ file, onConfirm, onCancel }: PhotoCropModalProp
       canvas.width = cw;
       canvas.height = ch;
 
-      // Crop inicial centrado con ratio 16/9
+      // Crop inicial centrado con ratio 4/3
       const cropH = Math.min(ch, Math.round(cw / ASPECT));
       const cropW = Math.round(cropH * ASPECT);
       const initialCrop = {

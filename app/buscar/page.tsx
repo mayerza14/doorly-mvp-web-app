@@ -35,6 +35,9 @@ export default function BuscarPage() {
   const [precioMax, setPrecioMax] = useState(10000);
   const [tamanoMin, setTamanoMin] = useState(0);
   const [acceso24, setAcceso24] = useState(false);
+  const maxPrecio = listings.length > 0
+    ? Math.ceil(Math.max(...listings.map((l) => l.price_daily)) / 500) * 500
+    : 10000;
   const [fitsSeleccionados, setFitsSeleccionados] = useState<string[]>([]);
  
   // Cuenta cuántos filtros están activos para mostrar el badge
@@ -182,6 +185,7 @@ export default function BuscarPage() {
                   tamanoMin={tamanoMin} setTamanoMin={setTamanoMin}
                   acceso24={acceso24} setAcceso24={setAcceso24}
                   fitsSeleccionados={fitsSeleccionados} setFitsSeleccionados={setFitsSeleccionados}
+              maxPrecio={maxPrecio}
                 />
               </SheetContent>
             </Sheet>
@@ -229,6 +233,7 @@ export default function BuscarPage() {
                 tamanoMin={tamanoMin} setTamanoMin={setTamanoMin}
                 acceso24={acceso24} setAcceso24={setAcceso24}
                 fitsSeleccionados={fitsSeleccionados} setFitsSeleccionados={setFitsSeleccionados}
+              maxPrecio={maxPrecio}
               />
             </div>
           </aside>

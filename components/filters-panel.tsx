@@ -28,6 +28,7 @@ interface FiltersPanelProps {
   setAcceso24: (value: boolean) => void;
   fitsSeleccionados: string[];
   setFitsSeleccionados: (value: string[]) => void;
+  maxPrecio: number;
 }
 
 const FITS_OPTIONS = [
@@ -52,6 +53,7 @@ export function FiltersPanel({
   setAcceso24,
   fitsSeleccionados,
   setFitsSeleccionados,
+  maxPrecio,
 }: FiltersPanelProps) {
   const toggleFit = (fit: string) => {
     if (fitsSeleccionados.includes(fit)) {
@@ -109,7 +111,7 @@ export function FiltersPanel({
           <Slider
             id="precio"
             min={500}
-            max={10000}
+            max={maxPrecio}
             step={500}
             value={[precioMax]}
             onValueChange={(value) => setPrecioMax(value[0])}
