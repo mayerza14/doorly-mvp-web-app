@@ -143,14 +143,31 @@ export function ListingCard({ listing }: ListingCardProps) {
 
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
           <div>
-            <div className="text-lg font-bold text-foreground">
-              ${listing.priceDaily.toLocaleString()}
-              <span className="text-sm font-normal text-muted-foreground">/día</span>
-            </div>
-            {listing.priceWeekly && (
-              <div className="text-xs text-muted-foreground">
-                Desde ${listing.priceWeekly.toLocaleString()}/semana
+            {listing.bookingMode === 'monthly' ? (
+              <div className="text-lg font-bold text-foreground">
+                ${(listing.priceMonthly || 0).toLocaleString()}
+                <span className="text-sm font-normal text-muted-foreground">/mes</span>
               </div>
+            ) : listing.bookingMode === 'both' ? (
+              <div className="text-lg font-bold text-foreground">
+                ${listing.priceDaily.toLocaleString()}
+                <span className="text-sm font-normal text-muted-foreground">/día</span>
+                <span className="text-muted-foreground mx-1">·</span>
+                ${(listing.priceMonthly || 0).toLocaleString()}
+                <span className="text-sm font-normal text-muted-foreground">/mes</span>
+              </div>
+            ) : (
+              <>
+                <div className="text-lg font-bold text-foreground">
+                  ${listing.priceDaily.toLocaleString()}
+                  <span className="text-sm font-normal text-muted-foreground">/día</span>
+                </div>
+                {listing.priceWeekly && (
+                  <div className="text-xs text-muted-foreground">
+                    Desde ${listing.priceWeekly.toLocaleString()}/semana
+                  </div>
+                )}
+              </>
             )}
           </div>
           <Button asChild size="sm">

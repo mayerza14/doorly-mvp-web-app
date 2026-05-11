@@ -1,5 +1,5 @@
 "use client";
- 
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,11 +8,19 @@ import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Link from "next/link";
 import type { Listing, AvailabilityBlock } from "@/lib/types";
 import { type DateRange } from "react-day-picker";
 import { CalendarIcon, Loader2, AlertTriangle, Camera } from "lucide-react";
-import { format } from "date-fns";
+import { format, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -20,7 +28,7 @@ import {
   calcRenterCommission,
   calcRenterTotal,
 } from "@/lib/commission";
- 
+
 interface BookingWidgetProps {
   listing: Listing;
   blockedDates: AvailabilityBlock[];
@@ -34,9 +42,12 @@ export function BookingWidget({
 }: BookingWidgetProps) {
   const router = useRouter();
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [monthlyStartDate, setMonthlyStartDate] = useState<Date | undefined>();
+  const [monthlyMonths, setMonthlyMonths] = useState<number | undefined>();
   const [isReserving, setIsReserving] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
- 
+  const [activeTab, setActiveTab] = useState<'flexible' | 'monthly'>('flexible');
+
   const disabledRanges = blockedDates
     .filter((block) => block.listingId === listing.id)
     .map((block) => {
@@ -47,32 +58,20 @@ export function BookingWidget({
         to: new Date(Number(eYear), Number(eMonth) - 1, Number(eDay), 23, 59, 59),
       };
     });
- 
-  const calculatePrice = () => {
+
+  const calculatePriceFlexible = () => {
     if (!dateRange?.from || !dateRange?.to) return null;
- 
+
     const days =
       Math.ceil(
         (dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)
       ) + 1;
- 
+
     let basePrice = 0;
     let breakdown = "";
     let rateType = "";
- 
-    if (days >= 30 && listing.priceMonthly) {
-      const months = Math.floor(days / 30);
-      const remainingDays = days % 30;
-      const weeklyRate = listing.priceWeekly || listing.priceDaily * 7;
-      basePrice =
-        months * listing.priceMonthly +
-        (remainingDays >= 7 && listing.priceWeekly
-          ? Math.floor(remainingDays / 7) * weeklyRate +
-            (remainingDays % 7) * listing.priceDaily
-          : remainingDays * listing.priceDaily);
-      breakdown = `${months} mes(es)`;
-      rateType = "mensual";
-    } else if (days >= 7 && listing.priceWeekly) {
+
+    if (days >= 7 && listing.priceWeekly) {
       const weeks = Math.floor(days / 7);
       const remainingDays = days % 7;
       basePrice = weeks * listing.priceWeekly + remainingDays * listing.priceDaily;
@@ -83,21 +82,58 @@ export function BookingWidget({
       breakdown = `${days} día(s)`;
       rateType = "diario";
     }
- 
+
     const renterCommission = calcRenterCommission(basePrice);
     const renterTotal = calcRenterTotal(basePrice);
- 
+
     return { days, basePrice, breakdown, rateType, renterCommission, renterTotal };
   };
- 
-  const priceInfo = calculatePrice();
- 
+
+  const calculatePriceMonthly = () => {
+    if (!monthlyStartDate || !monthlyMonths) return null;
+
+    const basePrice = monthlyMonths * (listing.priceMonthly || 0);
+    const renterCommission = calcRenterCommission(basePrice);
+    const renterTotal = calcRenterTotal(basePrice);
+
+    return {
+      days: monthlyMonths * 30,
+      basePrice,
+      breakdown: `${monthlyMonths} mes(es)`,
+      rateType: "mensual",
+      renterCommission,
+      renterTotal,
+    };
+  };
+
+  const priceInfo =
+    listing.bookingMode === 'monthly' && !monthlyStartDate
+      ? null
+      : listing.bookingMode === 'monthly'
+      ? calculatePriceMonthly()
+      : calculatePriceFlexible();
+
+  const effectiveMode = listing.bookingMode === 'both' ? activeTab : listing.bookingMode;
+
   const handleReserve = async () => {
-    if (!dateRange?.from || !dateRange?.to || !priceInfo) return;
+    if (!priceInfo) return;
     if (!acceptedTerms) return;
- 
+
+    let startDateStr = "";
+    let endDateStr = "";
+
+    if (effectiveMode === 'flexible') {
+      if (!dateRange?.from || !dateRange?.to) return;
+      startDateStr = format(dateRange.from, "yyyy-MM-dd");
+      endDateStr = format(dateRange.to, "yyyy-MM-dd");
+    } else {
+      if (!monthlyStartDate || !monthlyMonths) return;
+      startDateStr = format(monthlyStartDate, "yyyy-MM-dd");
+      endDateStr = format(addMonths(monthlyStartDate, monthlyMonths), "yyyy-MM-dd");
+    }
+
     setIsReserving(true);
- 
+
     try {
       const {
         data: { session },
@@ -106,20 +142,21 @@ export function BookingWidget({
         router.push(`/auth?returnUrl=/espacios/${listing.id}`);
         return;
       }
- 
+
       const { data: holdData, error: holdError } = await supabase.functions.invoke(
         "create-hold",
         {
           body: {
             listing_id: listing.id,
-            start_date: format(dateRange.from, "yyyy-MM-dd"),
-            end_date: format(dateRange.to, "yyyy-MM-dd"),
+            start_date: startDateStr,
+            end_date: endDateStr,
             amount: priceInfo.basePrice,
             total_amount: priceInfo.renterTotal,
+            booking_mode: effectiveMode,
           },
         }
       );
- 
+
       if (holdError) {
         let mensajeReal = holdError.message;
         if (holdError.context && typeof holdError.context.json === "function") {
@@ -134,15 +171,15 @@ export function BookingWidget({
         setIsReserving(false);
         return;
       }
- 
+
       const bookingId = holdData?.booking_id || holdData?.id;
       if (!bookingId) throw new Error("No se pudo obtener el ID de la reserva.");
- 
+
       const { data: mpData, error: mpError } = await supabase.functions.invoke(
         "mp-create-preference",
         { body: { booking_id: bookingId } }
       );
- 
+
       if (mpError) {
         if (mpError.context && typeof mpError.context.json === "function") {
           const errorBody = await mpError.context.json().catch(() => ({}));
@@ -154,7 +191,7 @@ export function BookingWidget({
         setIsReserving(false);
         return;
       }
- 
+
       if (mpData?.init_point) {
         window.location.href = mpData.init_point;
       } else {
@@ -172,31 +209,38 @@ export function BookingWidget({
     <Card className="shadow-lg border-primary/10">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold">
-            ${listing.priceDaily.toLocaleString()}
-          </span>
-          <span className="text-base font-normal text-muted-foreground">/ día</span>
+          {listing.bookingMode === 'monthly' ? (
+            <>
+              <span className="text-2xl font-bold">
+                ${listing.priceMonthly?.toLocaleString()}
+              </span>
+              <span className="text-base font-normal text-muted-foreground">/ mes</span>
+            </>
+          ) : (
+            <>
+              <span className="text-2xl font-bold">
+                ${listing.priceDaily.toLocaleString()}
+              </span>
+              <span className="text-base font-normal text-muted-foreground">/ día</span>
+            </>
+          )}
         </CardTitle>
-        {(listing.priceWeekly || listing.priceMonthly) && (
+        {listing.bookingMode !== 'monthly' && (listing.priceWeekly || listing.priceMonthly) && (
           <div className="flex gap-2 flex-wrap mt-1">
             {listing.priceWeekly && (
               <Badge variant="secondary" className="text-[10px] uppercase font-bold">
                 ${listing.priceWeekly.toLocaleString()}/semana
               </Badge>
             )}
-            {listing.priceMonthly && (
-              <Badge variant="secondary" className="text-[10px] uppercase font-bold">
-                ${listing.priceMonthly.toLocaleString()}/mes
-              </Badge>
-            )}
           </div>
         )}
+        {listing.bookingMode === 'monthly' && listing.minMonths && (
+          <p className="text-xs text-muted-foreground mt-2">Permanencia mínima: {listing.minMonths} {listing.minMonths === 1 ? 'mes' : 'meses'}</p>
+        )}
       </CardHeader>
- 
+
       <CardContent className="p-0">
         <div className="overflow-y-auto max-h-[600px] px-6 pb-6 space-y-4">
- 
-          {/* ── Aviso datos bancarios del host ── */}
           {!hostHasPayoutMethod && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-md p-3">
               <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
@@ -207,34 +251,140 @@ export function BookingWidget({
               </p>
             </div>
           )}
- 
-          {/* ── Calendario ── */}
-          <div className="space-y-2">
-            <label className="text-sm font-semibold">Seleccioná las fechas</label>
-            <div className="border border-border rounded-md p-3 bg-card">
-              <Calendar
-                mode="range"
-                selected={dateRange}
-                onSelect={setDateRange}
-                disabled={[{ before: new Date() }, ...disabledRanges]}
-                locale={es}
-                numberOfMonths={1}
-                className="rounded-md"
-              />
-            </div>
-            {dateRange?.from && dateRange?.to && (
-              <div className="flex items-center gap-2 text-sm text-primary font-medium mt-2 bg-primary/5 p-2 rounded-md">
-                <CalendarIcon className="h-4 w-4" />
-                {format(dateRange.from, "d 'de' MMM", { locale: es })} -{" "}
-                {format(dateRange.to, "d 'de' MMM yyyy", { locale: es })}
+
+          {listing.bookingMode === 'both' ? (
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'flexible' | 'monthly')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="flexible">Por días</TabsTrigger>
+                <TabsTrigger value="monthly">Por meses</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="flexible" className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">Seleccioná las fechas</label>
+                  <div className="border border-border rounded-md p-3 bg-card">
+                    <Calendar
+                      mode="range"
+                      selected={dateRange}
+                      onSelect={setDateRange}
+                      disabled={[{ before: new Date() }, ...disabledRanges]}
+                      locale={es}
+                      numberOfMonths={1}
+                      className="rounded-md"
+                    />
+                  </div>
+                  {dateRange?.from && dateRange?.to && (
+                    <div className="flex items-center gap-2 text-sm text-primary font-medium mt-2 bg-primary/5 p-2 rounded-md">
+                      <CalendarIcon className="h-4 w-4" />
+                      {format(dateRange.from, "d 'de' MMM", { locale: es })} -{" "}
+                      {format(dateRange.to, "d 'de' MMM yyyy", { locale: es })}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="monthly" className="space-y-4">
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Fecha de inicio</label>
+                    <div className="border border-border rounded-md p-3 bg-card">
+                      <Calendar
+                        mode="single"
+                        selected={monthlyStartDate}
+                        onSelect={setMonthlyStartDate}
+                        disabled={[{ before: new Date() }, ...disabledRanges]}
+                        locale={es}
+                        numberOfMonths={1}
+                        className="rounded-md"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="monthlyMonths">Cantidad de meses *</Label>
+                    <Select value={monthlyMonths?.toString() || ""} onValueChange={(v) => setMonthlyMonths(v ? parseInt(v) : undefined)}>
+                      <SelectTrigger id="monthlyMonths">
+                        <SelectValue placeholder="Seleccionar meses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 25 - (listing.minMonths || 1) + 1 }, (_, i) => listing.minMonths! + i).map((months) => (
+                          <SelectItem key={months} value={months.toString()}>
+                            {months} {months === 1 ? 'mes' : 'meses'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {monthlyStartDate && monthlyMonths && (
+                    <div className="text-sm text-muted-foreground bg-primary/5 p-2 rounded-md">
+                      Hasta: {format(addMonths(monthlyStartDate, monthlyMonths), "d 'de' MMMM 'de' yyyy", { locale: es })}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          ) : listing.bookingMode === 'monthly' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">Fecha de inicio</label>
+                <div className="border border-border rounded-md p-3 bg-card">
+                  <Calendar
+                    mode="single"
+                    selected={monthlyStartDate}
+                    onSelect={setMonthlyStartDate}
+                    disabled={[{ before: new Date() }, ...disabledRanges]}
+                    locale={es}
+                    numberOfMonths={1}
+                    className="rounded-md"
+                  />
+                </div>
               </div>
-            )}
-          </div>
- 
-          {/* ── Desglose de costos ── */}
+              <div className="space-y-2">
+                <Label htmlFor="monthlyMonths">Cantidad de meses *</Label>
+                <Select value={monthlyMonths?.toString() || ""} onValueChange={(v) => setMonthlyMonths(v ? parseInt(v) : undefined)}>
+                  <SelectTrigger id="monthlyMonths">
+                    <SelectValue placeholder="Seleccionar meses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 25 - (listing.minMonths || 1) + 1 }, (_, i) => listing.minMonths! + i).map((months) => (
+                      <SelectItem key={months} value={months.toString()}>
+                        {months} {months === 1 ? 'mes' : 'meses'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {monthlyStartDate && monthlyMonths && (
+                <div className="text-sm text-muted-foreground bg-primary/5 p-2 rounded-md">
+                  Hasta: {format(addMonths(monthlyStartDate, monthlyMonths), "d 'de' MMMM 'de' yyyy", { locale: es })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Seleccioná las fechas</label>
+              <div className="border border-border rounded-md p-3 bg-card">
+                <Calendar
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  disabled={[{ before: new Date() }, ...disabledRanges]}
+                  locale={es}
+                  numberOfMonths={1}
+                  className="rounded-md"
+                />
+              </div>
+              {dateRange?.from && dateRange?.to && (
+                <div className="flex items-center gap-2 text-sm text-primary font-medium mt-2 bg-primary/5 p-2 rounded-md">
+                  <CalendarIcon className="h-4 w-4" />
+                  {format(dateRange.from, "d 'de' MMM", { locale: es })} -{" "}
+                  {format(dateRange.to, "d 'de' MMM yyyy", { locale: es })}
+                </div>
+              )}
+            </div>
+          )}
+
           {priceInfo && (
             <div className="space-y-3 pt-4 border-t border-border">
- 
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">
                   Reserva por {priceInfo.breakdown}
@@ -243,7 +393,7 @@ export function BookingWidget({
                   ${priceInfo.basePrice.toLocaleString()}
                 </span>
               </div>
- 
+
               <div className="flex justify-between text-sm">
                 <div className="flex flex-col">
                   <span className="flex items-center gap-1.5 font-medium text-foreground">
@@ -275,7 +425,7 @@ export function BookingWidget({
                   )}
                 </div>
               </div>
- 
+
               <div className="flex justify-between items-center border-t border-dashed pt-4 mt-2">
                 <span className="text-base font-bold text-foreground">
                   Total a pagar
@@ -286,8 +436,7 @@ export function BookingWidget({
               </div>
             </div>
           )}
- 
-          {/* ── Recomendación de documentar — aparece cuando hay fechas seleccionadas ── */}
+
           {priceInfo && (
             <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
               <Camera className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
@@ -302,8 +451,7 @@ export function BookingWidget({
               </div>
             </div>
           )}
- 
-          {/* ── Checkbox términos ── */}
+
           <div className="flex items-start gap-2 pt-1">
             <Checkbox
               id="terms-booking"
@@ -333,12 +481,11 @@ export function BookingWidget({
               de Doorly
             </Label>
           </div>
- 
+
           <Button
             onClick={handleReserve}
             disabled={
-              !dateRange?.from ||
-              !dateRange?.to ||
+              !priceInfo ||
               isReserving ||
               !acceptedTerms ||
               !hostHasPayoutMethod
@@ -355,7 +502,7 @@ export function BookingWidget({
               "Reservar ahora"
             )}
           </Button>
- 
+
           <p className="text-[11px] text-muted-foreground text-center leading-relaxed px-2">
             Al hacer clic en "Reservar ahora", serás redirigido a Mercado Pago
             para completar la operación de forma segura.

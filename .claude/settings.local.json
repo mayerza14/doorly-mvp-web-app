@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(@\\(\"C:\\\\Program Files\\\\nodejs\\\\npx.cmd\", \"$env:APPDATA\\\\npm\\\\npx.cmd\", \"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\\\\npx.cmd\"\\) | ForEach-Object { if \\(Test-Path $_\\) { Write-Output \"Found: $_\" } })",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)"
+    ]
+  }
+}

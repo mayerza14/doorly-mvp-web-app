@@ -25,6 +25,8 @@ export interface Listing {
   priceDaily: number;
   priceWeekly?: number;
   priceMonthly?: number;
+  bookingMode: 'flexible' | 'monthly' | 'both';
+  minMonths?: number;
   photos: string[];
   status: "active" | "pending_review" | "suspended";
   createdAt: string;
@@ -48,6 +50,7 @@ export interface Booking {
   totalAmount: number;
   status: "pending_payment" | "confirmed" | "cancelled" | "completed" | "refunded" | "disputed";
   paymentProvider: "mercadopago";
+  bookingMode?: 'flexible' | 'monthly';
   createdAt: string;
 }
 

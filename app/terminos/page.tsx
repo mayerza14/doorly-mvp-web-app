@@ -65,6 +65,17 @@ const sections = [
     ),
   },
   {
+    id: "modos-reserva",
+    title: "Modos de reserva",
+    content: (
+      <>
+        <p><strong className="text-foreground">Modo flexible:</strong> El guardador reserva días o semanas según disponibilidad. El precio se cobra por día y es apto para necesidades puntuales o de corta duración.</p>
+        <p><strong className="text-foreground">Modo mensual:</strong> El guardador alquila el espacio por períodos de un mes completo. El precio se cobra por mes al inicio de cada período.</p>
+        <p><strong className="text-foreground">Reembolso en modo mensual:</strong> El mes ya iniciado y abonado no es reembolsable. Si el guardador desocupa el espacio antes de que finalice el período en curso, no corresponde reembolso por los días restantes. La política de reembolso aplica únicamente sobre los meses futuros no iniciados.</p>
+      </>
+    ),
+  },
+  {
     id: "cancelaciones",
     title: "Cancelaciones",
     content: (

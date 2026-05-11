@@ -20,6 +20,8 @@ interface FiltersPanelProps {
   setZona: (value: string) => void;
   tipo: string;
   setTipo: (value: string) => void;
+  modoReserva: 'todos' | 'flexible' | 'monthly';
+  setModoReserva: (value: 'todos' | 'flexible' | 'monthly') => void;
   precioMax: number;
   setPrecioMax: (value: number) => void;
   tamanoMin: number;
@@ -45,6 +47,8 @@ export function FiltersPanel({
   setZona,
   tipo,
   setTipo,
+  modoReserva,
+  setModoReserva,
   precioMax,
   setPrecioMax,
   tamanoMin,
@@ -100,10 +104,27 @@ export function FiltersPanel({
           </Select>
         </div>
 
+        {/* Modo de reserva */}
+        <div className="space-y-2">
+          <Label htmlFor="modoReserva">Modo de reserva</Label>
+          <Select value={modoReserva} onValueChange={setModoReserva}>
+            <SelectTrigger id="modoReserva">
+              <SelectValue placeholder="Seleccionar modo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="flexible">Por días</SelectItem>
+              <SelectItem value="monthly">Por mes</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Precio máximo */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="precio">Precio máximo por día</Label>
+            <Label htmlFor="precio">
+              {modoReserva === 'monthly' ? 'Precio máximo por mes' : 'Precio máximo por día'}
+            </Label>
             <span className="text-sm font-medium text-foreground">
               ${precioMax.toLocaleString()}
             </span>

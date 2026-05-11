@@ -117,6 +117,8 @@ export default async function EspacioDetailPage({
     latExact: rawListing.lat_exact,
     lngExact: rawListing.lng_exact,
     doorly_certified: rawListing.doorly_certified || false,
+    bookingMode: rawListing.booking_mode || 'flexible',
+    minMonths: rawListing.min_months || null,
   };
 
   const approxCoords =

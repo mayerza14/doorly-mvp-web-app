@@ -63,6 +63,8 @@ interface FormData {
   priceDaily: number;
   priceWeekly?: number;
   priceMonthly?: number;
+  bookingMode: 'flexible' | 'monthly' | 'both';
+  minMonths?: number;
   photos: string[];
   latExact: number;   // ← agregado
   lngExact: number;   // ← agregado
@@ -134,6 +136,8 @@ function PublishFormContent() {
     priceDaily: 0,
     priceWeekly: undefined,
     priceMonthly: undefined,
+    bookingMode: 'flexible',
+    minMonths: undefined,
     photos: [],
     latExact: 0,   // ← valor inicial correcto
     lngExact: 0,   // ← valor inicial correcto
@@ -196,6 +200,8 @@ function PublishFormContent() {
           priceDaily: data.price_daily || 0,
           priceWeekly: data.price_weekly || undefined,
           priceMonthly: data.price_monthly || undefined,
+          bookingMode: data.booking_mode || 'flexible',
+          minMonths: data.min_months || undefined,
           photos: [],
           latExact: data.lat_exact || 0,
           lngExact: data.lng_exact || 0,
@@ -271,6 +277,10 @@ function PublishFormContent() {
     }
     if (step === 3) {
       if (!formData.priceDaily || formData.priceDaily <= 0) newErrors.priceDaily = "El precio diario es requerido";
+      if (formData.bookingMode === 'monthly' || formData.bookingMode === 'both') {
+        if (!formData.priceMonthly || formData.priceMonthly <= 0) newErrors.priceMonthly = "El precio mensual es requerido para este modo";
+        if (!formData.minMonths || formData.minMonths <= 0) newErrors.minMonths = "La permanencia mínima es requerida para este modo";
+      }
     }
     if (step === 4) {
       if (!acceptedTerms) newErrors.terms = "Debés aceptar los términos y condiciones";
@@ -324,7 +334,9 @@ function PublishFormContent() {
             area_label: formData.areaLabel,
             price_daily: Math.round(formData.priceDaily ?? 0),
             price_weekly: formData.priceWeekly ? Math.round(formData.priceWeekly) : null,
-            price_monthly: formData.priceMonthly ? Math.round(formData.priceMonthly) : null,
+            price_monthly: formData.bookingMode === 'flexible' ? null : (formData.priceMonthly ? Math.round(formData.priceMonthly) : null),
+            booking_mode: formData.bookingMode,
+            min_months: formData.minMonths ?? null,
             full_address_private: formData.fullAddressPrivate,
             access_notes_private: formData.accessHoursText ?? "",
             size_m2: sizeM2,
@@ -354,7 +366,9 @@ function PublishFormContent() {
             area_label: formData.areaLabel,
             price_daily: Math.round(formData.priceDaily ?? 0),
             price_weekly: formData.priceWeekly ? Math.round(formData.priceWeekly) : null,
-            price_monthly: formData.priceMonthly ? Math.round(formData.priceMonthly) : null,
+            price_monthly: formData.bookingMode === 'flexible' ? null : (formData.priceMonthly ? Math.round(formData.priceMonthly) : null),
+            booking_mode: formData.bookingMode,
+            min_months: formData.minMonths ?? null,
             full_address_private: formData.fullAddressPrivate,
             access_notes_private: formData.accessHoursText ?? "",
             access_type: formData.accessType,
@@ -677,28 +691,93 @@ function PublishFormContent() {
             {/* ── PASO 3 ── */}
             {currentStep === 3 && (
               <>
-                <div className="space-y-2">
-                  <Label>Precios</Label>
-                  <p className="text-xs text-muted-foreground">El precio diario es obligatorio. Los descuentos por semana y mes son opcionales pero aumentan las reservas.</p>
-                </div>
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="priceDaily">Precio por día (ARS) *</Label>
-                    <Input id="priceDaily" type="number" min="0" placeholder="2500" value={formData.priceDaily || ""} onChange={(e) => updateFormData("priceDaily", parseFloat(e.target.value) || 0)} />
-                    {errors.priceDaily && <p className="text-sm text-destructive">{errors.priceDaily}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="priceWeekly">Precio por semana (ARS)</Label>
-                    <Input id="priceWeekly" type="number" min="0" placeholder="15000 (opcional)" value={formData.priceWeekly || ""} onChange={(e) => updateFormData("priceWeekly", e.target.value ? parseFloat(e.target.value) : undefined)} />
-                    {formData.priceWeekly && formData.priceDaily > 0 && <p className="text-xs text-muted-foreground">Descuento: {Math.round((1 - formData.priceWeekly / (formData.priceDaily * 7)) * 100)}% vs precio diario</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="priceMonthly">Precio por mes (ARS)</Label>
-                    <Input id="priceMonthly" type="number" min="0" placeholder="50000 (opcional)" value={formData.priceMonthly || ""} onChange={(e) => updateFormData("priceMonthly", e.target.value ? parseFloat(e.target.value) : undefined)} />
-                    {formData.priceMonthly && formData.priceDaily > 0 && <p className="text-xs text-muted-foreground">Descuento: {Math.round((1 - formData.priceMonthly / (formData.priceDaily * 30)) * 100)}% vs precio diario</p>}
+                {/* Selector de Modo */}
+                <div className="space-y-3">
+                  <Label>Modo de reserva *</Label>
+                  <p className="text-xs text-muted-foreground">Elegí cómo tus inquilinos pueden reservar tu espacio</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {(['flexible', 'monthly', 'both'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => updateFormData('bookingMode', mode)}
+                        className={`p-4 rounded-lg border-2 transition-all text-left ${
+                          formData.bookingMode === mode
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <p className="font-semibold text-sm">
+                          {mode === 'flexible' ? 'Por días' : mode === 'monthly' ? 'Mensual' : 'Ambos modos'}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {mode === 'flexible'
+                            ? 'Precio diario y descuentos'
+                            : mode === 'monthly'
+                            ? 'Precio mensual fijo'
+                            : 'Flexibilidad máxima'}
+                        </p>
+                      </button>
+                    ))}
                   </div>
                 </div>
 
+                {/* Sección FLEXIBLE */}
+                {(formData.bookingMode === 'flexible' || formData.bookingMode === 'both') && (
+                  <div className="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div>
+                      <h4 className="font-semibold text-sm text-foreground">Precios por días</h4>
+                      <p className="text-xs text-muted-foreground mt-1">Define el precio diario y descuentos opcionales</p>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="priceDaily">Precio por día (ARS) *</Label>
+                        <Input id="priceDaily" type="number" min="0" placeholder="2500" value={formData.priceDaily || ""} onChange={(e) => updateFormData("priceDaily", parseFloat(e.target.value) || 0)} />
+                        {errors.priceDaily && <p className="text-sm text-destructive">{errors.priceDaily}</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="priceWeekly">Precio por semana (ARS)</Label>
+                        <Input id="priceWeekly" type="number" min="0" placeholder="15000 (opcional)" value={formData.priceWeekly || ""} onChange={(e) => updateFormData("priceWeekly", e.target.value ? parseFloat(e.target.value) : undefined)} />
+                        {formData.priceWeekly && formData.priceDaily > 0 && <p className="text-xs text-muted-foreground">Descuento: {Math.round((1 - formData.priceWeekly / (formData.priceDaily * 7)) * 100)}% vs precio diario</p>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sección MENSUAL */}
+                {(formData.bookingMode === 'monthly' || formData.bookingMode === 'both') && (
+                  <div className="space-y-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div>
+                      <h4 className="font-semibold text-sm text-foreground">Precio mensual</h4>
+                      <p className="text-xs text-muted-foreground mt-1">Define el precio mensual y la permanencia mínima requerida</p>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="priceMonthly">Precio por mes (ARS) *</Label>
+                        <Input id="priceMonthly" type="number" min="0" placeholder="50000" value={formData.priceMonthly || ""} onChange={(e) => updateFormData("priceMonthly", e.target.value ? parseFloat(e.target.value) : undefined)} />
+                        {errors.priceMonthly && <p className="text-sm text-destructive">{errors.priceMonthly}</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="minMonths">Permanencia mínima (meses) *</Label>
+                        <Select value={formData.minMonths?.toString() || ""} onValueChange={(v) => updateFormData("minMonths", v ? parseInt(v) : undefined)}>
+                          <SelectTrigger id="minMonths">
+                            <SelectValue placeholder="Seleccionar meses" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[1, 2, 3, 6, 12, 24].map((months) => (
+                              <SelectItem key={months} value={months.toString()}>
+                                {months} {months === 1 ? 'mes' : 'meses'}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {errors.minMonths && <p className="text-sm text-destructive">{errors.minMonths}</p>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Períodos no disponibles */}
                 <div className="space-y-4 pt-2">
                   <div>
                     <Label>Períodos no disponibles (opcional)</Label>
@@ -786,11 +865,38 @@ function PublishFormContent() {
                 </div>
 
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="bg-muted/50 px-4 py-2 border-b"><h3 className="font-semibold text-sm">Precios</h3></div>
-                  <div className="px-4 py-3 grid grid-cols-3 gap-4 text-sm">
-                    <div className="text-center"><p className="text-muted-foreground text-xs mb-1">Por día</p><p className="font-semibold text-lg">${formData.priceDaily?.toLocaleString("es-AR") || "—"}</p></div>
-                    <div className="text-center"><p className="text-muted-foreground text-xs mb-1">Por semana</p><p className="font-semibold text-lg">{formData.priceWeekly ? `$${formData.priceWeekly.toLocaleString("es-AR")}` : <span className="text-muted-foreground text-sm">No definido</span>}</p></div>
-                    <div className="text-center"><p className="text-muted-foreground text-xs mb-1">Por mes</p><p className="font-semibold text-lg">{formData.priceMonthly ? `$${formData.priceMonthly.toLocaleString("es-AR")}` : <span className="text-muted-foreground text-sm">No definido</span>}</p></div>
+                  <div className="bg-muted/50 px-4 py-2 border-b"><h3 className="font-semibold text-sm">Modo y Precios</h3></div>
+                  <div className="px-4 py-3 space-y-3 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-1">Modo de reserva</p>
+                      <Badge variant="secondary">
+                        {formData.bookingMode === 'flexible' ? 'Por días' : formData.bookingMode === 'monthly' ? 'Mensual' : 'Ambos modos'}
+                      </Badge>
+                    </div>
+                    {(formData.bookingMode === 'flexible' || formData.bookingMode === 'both') && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center">
+                          <p className="text-muted-foreground text-xs mb-1">Precio por día</p>
+                          <p className="font-semibold text-lg">${formData.priceDaily?.toLocaleString("es-AR") || "—"}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-muted-foreground text-xs mb-1">Precio por semana</p>
+                          <p className="font-semibold text-lg">{formData.priceWeekly ? `$${formData.priceWeekly.toLocaleString("es-AR")}` : <span className="text-muted-foreground text-sm">No definido</span>}</p>
+                        </div>
+                      </div>
+                    )}
+                    {(formData.bookingMode === 'monthly' || formData.bookingMode === 'both') && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center">
+                          <p className="text-muted-foreground text-xs mb-1">Precio mensual</p>
+                          <p className="font-semibold text-lg">${formData.priceMonthly?.toLocaleString("es-AR") || "—"}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-muted-foreground text-xs mb-1">Permanencia mínima</p>
+                          <p className="font-semibold text-lg">{formData.minMonths ? `${formData.minMonths} ${formData.minMonths === 1 ? 'mes' : 'meses'}` : "—"}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

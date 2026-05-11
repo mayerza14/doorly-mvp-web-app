@@ -35,16 +35,28 @@ export default function BuscarPage() {
   const [precioMax, setPrecioMax] = useState(10000);
   const [tamanoMin, setTamanoMin] = useState(0);
   const [acceso24, setAcceso24] = useState(false);
-  const maxPrecio = listings.length > 0
-    ? Math.ceil(Math.max(...listings.map((l) => l.price_daily)) / 500) * 500
-    : 10000;
   const [fitsSeleccionados, setFitsSeleccionados] = useState<string[]>([]);
- 
+  const [modoReserva, setModoReserva] = useState<'todos' | 'flexible' | 'monthly'>('todos');
+
+  const maxPrecio = useMemo(() => {
+    if (listings.length === 0) return modoReserva === 'monthly' ? 100000 : 10000;
+    if (modoReserva === 'monthly') {
+      const prices = listings.map((l) => l.price_monthly).filter((p): p is number => p != null);
+      return prices.length > 0 ? Math.ceil(Math.max(...prices) / 500) * 500 : 100000;
+    }
+    return Math.ceil(Math.max(...listings.map((l) => l.price_daily)) / 500) * 500;
+  }, [listings, modoReserva]);
+
+  useEffect(() => {
+    setPrecioMax(maxPrecio);
+  }, [modoReserva]);
+
   // Cuenta cuántos filtros están activos para mostrar el badge
   const activeFilterCount = [
     zona !== "",
     tipo !== "todos",
-    precioMax !== 10000,
+    modoReserva !== "todos",
+    precioMax < maxPrecio,
     tamanoMin !== 0,
     acceso24,
     fitsSeleccionados.length > 0,
@@ -82,6 +94,8 @@ export default function BuscarPage() {
         ...l,
         priceDaily: l.price_daily,
         priceWeekly: l.price_weekly ?? null,
+        priceMonthly: l.price_monthly ?? null,
+        bookingMode: l.booking_mode || 'flexible',
         areaLabel: l.area_label,
         spaceType: l.space_type,
         sizeM2: l.size_m2,
@@ -116,7 +130,13 @@ export default function BuscarPage() {
       }
       if (zona && !listing.area_label?.toLowerCase().includes(zona.toLowerCase())) return false;
       if (tipo !== "todos" && listing.space_type?.toLowerCase() !== tipo.toLowerCase()) return false;
-      if (listing.price_daily > precioMax) return false;
+      if (modoReserva === 'flexible' && listing.bookingMode !== 'flexible' && listing.bookingMode !== 'both') return false;
+      if (modoReserva === 'monthly') {
+        if (listing.bookingMode !== 'monthly' && listing.bookingMode !== 'both') return false;
+        if (listing.price_monthly == null) return false;
+      }
+      const priceToCheck = modoReserva === 'monthly' ? (listing.price_monthly ?? 0) : listing.price_daily;
+      if (priceToCheck > precioMax) return false;
       if (tamanoMin > 0 && (listing.size_m2 ?? 0) < tamanoMin) return false;
       if (acceso24 && listing.access_type !== "24_7") return false;
       if (fitsSeleccionados.length > 0) {
@@ -130,13 +150,25 @@ export default function BuscarPage() {
     });
  
     switch (sortBy) {
-      case "price-low": results.sort((a, b) => a.price_daily - b.price_daily); break;
-      case "price-high": results.sort((a, b) => b.price_daily - a.price_daily); break;
+      case "price-low":
+        results.sort((a, b) =>
+          modoReserva === 'monthly'
+            ? (a.price_monthly ?? 0) - (b.price_monthly ?? 0)
+            : a.price_daily - b.price_daily
+        );
+        break;
+      case "price-high":
+        results.sort((a, b) =>
+          modoReserva === 'monthly'
+            ? (b.price_monthly ?? 0) - (a.price_monthly ?? 0)
+            : b.price_daily - a.price_daily
+        );
+        break;
       default: results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
- 
+
     return results;
-  }, [listings, searchQuery, zona, tipo, precioMax, tamanoMin, acceso24, fitsSeleccionados, sortBy]);
+  }, [listings, searchQuery, zona, tipo, modoReserva, precioMax, tamanoMin, acceso24, fitsSeleccionados, sortBy]);
  
   return (
     <AppShell>
@@ -181,11 +213,12 @@ export default function BuscarPage() {
                 <FiltersPanel
                   zona={zona} setZona={setZona}
                   tipo={tipo} setTipo={setTipo}
+                  modoReserva={modoReserva} setModoReserva={setModoReserva}
                   precioMax={precioMax} setPrecioMax={setPrecioMax}
                   tamanoMin={tamanoMin} setTamanoMin={setTamanoMin}
                   acceso24={acceso24} setAcceso24={setAcceso24}
                   fitsSeleccionados={fitsSeleccionados} setFitsSeleccionados={setFitsSeleccionados}
-              maxPrecio={maxPrecio}
+                  maxPrecio={maxPrecio}
                 />
               </SheetContent>
             </Sheet>
@@ -229,11 +262,12 @@ export default function BuscarPage() {
               <FiltersPanel
                 zona={zona} setZona={setZona}
                 tipo={tipo} setTipo={setTipo}
+                modoReserva={modoReserva} setModoReserva={setModoReserva}
                 precioMax={precioMax} setPrecioMax={setPrecioMax}
                 tamanoMin={tamanoMin} setTamanoMin={setTamanoMin}
                 acceso24={acceso24} setAcceso24={setAcceso24}
                 fitsSeleccionados={fitsSeleccionados} setFitsSeleccionados={setFitsSeleccionados}
-              maxPrecio={maxPrecio}
+                maxPrecio={maxPrecio}
               />
             </div>
           </aside>

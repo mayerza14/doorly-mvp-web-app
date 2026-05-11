@@ -27,7 +27,7 @@ export default function HomePage() {
             </h1>
             <p className="mt-6 text-lg text-muted-foreground leading-relaxed text-pretty">
               Encontrá el lugar perfecto para guardar tus cosas o estacionar tu
-              vehículo. Seguro, confiable y cerca de donde lo necesitás.
+              vehículo, por días o por meses. Seguro, confiable y cerca de donde lo necesitás.
             </p>
             <HeroCTAs />
           </div>

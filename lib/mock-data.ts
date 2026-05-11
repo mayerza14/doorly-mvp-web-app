@@ -35,6 +35,7 @@ export const mockListings: Listing[] = [
     priceWeekly: 15000,
     priceMonthly: 50000,
     photos: [],
+    bookingMode: "flexible",
     status: "active",
   },
   {
@@ -67,6 +68,7 @@ export const mockListings: Listing[] = [
     priceWeekly: 4500,
     priceMonthly: 15000,
     photos: [],
+    bookingMode: "flexible",
     status: "active",
   },
   {
@@ -103,6 +105,7 @@ export const mockListings: Listing[] = [
     priceWeekly: 21000,
     priceMonthly: 70000,
     photos: [],
+    bookingMode: "flexible",
     status: "active",
   },
   {
@@ -138,6 +141,7 @@ export const mockListings: Listing[] = [
     priceWeekly: 24000,
     priceMonthly: 80000,
     photos: [],
+    bookingMode: "flexible",
     status: "active",
   },
   {
@@ -161,6 +165,7 @@ export const mockListings: Listing[] = [
     priceDaily: 500,
     priceMonthly: 10000,
     photos: [],
+    bookingMode: "flexible",
     status: "active",
   },
   {
@@ -184,6 +189,7 @@ export const mockListings: Listing[] = [
     priceWeekly: 12000,
     priceMonthly: 40000,
     photos: [],
+    bookingMode: "flexible",
     status: "active",
   },
   {
@@ -219,6 +225,7 @@ export const mockListings: Listing[] = [
     priceDaily: 5000,
     priceMonthly: 120000,
     photos: [],
+    bookingMode: "flexible",
     status: "active",
   },
   {
@@ -242,6 +249,7 @@ export const mockListings: Listing[] = [
     priceWeekly: 17000,
     priceMonthly: 55000,
     photos: [],
+    bookingMode: "flexible",
     status: "active",
   },
   {
@@ -270,6 +278,7 @@ export const mockListings: Listing[] = [
     priceWeekly: 3900,
     priceMonthly: 13000,
     photos: [],
+    bookingMode: "flexible",
     status: "active",
   },
   {
@@ -306,6 +315,7 @@ export const mockListings: Listing[] = [
     priceWeekly: 27000,
     priceMonthly: 90000,
     photos: [],
+    bookingMode: "flexible",
     status: "active",
   },
 ];
