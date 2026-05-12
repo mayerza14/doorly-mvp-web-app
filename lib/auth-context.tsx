@@ -11,6 +11,7 @@ interface Profile {
   role: 'renter' | 'host' | 'both' | 'admin'
   full_name?: string
   avatar_url?: string
+  phone?: string
 }
 
 interface AuthContextType {

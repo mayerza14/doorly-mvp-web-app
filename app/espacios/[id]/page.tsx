@@ -58,7 +58,7 @@ export default async function EspacioDetailPage({
   // Traer reservas bloqueadas
   const { data: bookingsData, error: bookingsError } = await supabase
     .from("bookings")
-    .select("start_date, end_date")
+    .select("id, start_date, end_date")
     .eq("listing_id", id)
     .in("status", ["hold", "confirmed", "completed"]);
 
@@ -69,6 +69,7 @@ export default async function EspacioDetailPage({
   .rpc("has_payout_method", { uid: rawListing.host_id });
 
   const blockedDates = (bookingsData || []).map((b) => ({
+    id: b.id,
     listingId: id,
     startDate: b.start_date,
     endDate: b.end_date,

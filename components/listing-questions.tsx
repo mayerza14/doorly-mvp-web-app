@@ -37,7 +37,7 @@ interface Question {
   answered_at: string | null;
   created_at: string;
   user_id: string;
-  asker?: { full_name: string | null };
+  asker?: { full_name: string | null } | null;
 }
 
 interface ListingQuestionsProps {
