@@ -149,12 +149,15 @@ export function ListingCard({ listing }: ListingCardProps) {
                 <span className="text-sm font-normal text-muted-foreground">/mes</span>
               </div>
             ) : listing.bookingMode === 'both' ? (
-              <div className="text-lg font-bold text-foreground">
-                ${listing.priceDaily.toLocaleString()}
-                <span className="text-sm font-normal text-muted-foreground">/día</span>
-                <span className="text-muted-foreground mx-1">·</span>
-                ${(listing.priceMonthly || 0).toLocaleString()}
-                <span className="text-sm font-normal text-muted-foreground">/mes</span>
+              <div className="flex flex-col">
+                <div className="text-base font-bold text-foreground leading-tight">
+                  ${listing.priceDaily.toLocaleString()}
+                  <span className="text-sm font-normal text-muted-foreground">/día</span>
+                </div>
+                <div className="text-base font-bold text-foreground leading-tight">
+                  ${(listing.priceMonthly || 0).toLocaleString()}
+                  <span className="text-sm font-normal text-muted-foreground">/mes</span>
+                </div>
               </div>
             ) : (
               <>

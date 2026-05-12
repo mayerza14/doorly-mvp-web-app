@@ -106,14 +106,10 @@ export function BookingWidget({
     };
   };
 
-  const priceInfo =
-    listing.bookingMode === 'monthly' && !monthlyStartDate
-      ? null
-      : listing.bookingMode === 'monthly'
-      ? calculatePriceMonthly()
-      : calculatePriceFlexible();
-
   const effectiveMode = listing.bookingMode === 'both' ? activeTab : listing.bookingMode;
+
+  const priceInfo =
+    effectiveMode === 'monthly' ? calculatePriceMonthly() : calculatePriceFlexible();
 
   const handleReserve = async () => {
     if (!priceInfo) return;
@@ -209,7 +205,7 @@ export function BookingWidget({
     <Card className="shadow-lg border-primary/10">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-baseline gap-2">
-          {listing.bookingMode === 'monthly' ? (
+          {effectiveMode === 'monthly' ? (
             <>
               <span className="text-2xl font-bold">
                 ${listing.priceMonthly?.toLocaleString()}
@@ -225,16 +221,14 @@ export function BookingWidget({
             </>
           )}
         </CardTitle>
-        {listing.bookingMode !== 'monthly' && (listing.priceWeekly || listing.priceMonthly) && (
+        {effectiveMode === 'flexible' && listing.priceWeekly && (
           <div className="flex gap-2 flex-wrap mt-1">
-            {listing.priceWeekly && (
-              <Badge variant="secondary" className="text-[10px] uppercase font-bold">
-                ${listing.priceWeekly.toLocaleString()}/semana
-              </Badge>
-            )}
+            <Badge variant="secondary" className="text-[10px] uppercase font-bold">
+              ${listing.priceWeekly.toLocaleString()}/semana
+            </Badge>
           </div>
         )}
-        {listing.bookingMode === 'monthly' && listing.minMonths && (
+        {effectiveMode === 'monthly' && listing.minMonths && (
           <p className="text-xs text-muted-foreground mt-2">Permanencia mínima: {listing.minMonths} {listing.minMonths === 1 ? 'mes' : 'meses'}</p>
         )}
       </CardHeader>
@@ -253,7 +247,12 @@ export function BookingWidget({
           )}
 
           {listing.bookingMode === 'both' ? (
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'flexible' | 'monthly')}>
+            <Tabs value={activeTab} onValueChange={(v) => {
+              const next = v as 'flexible' | 'monthly';
+              setActiveTab(next);
+              if (next === 'monthly') setDateRange(undefined);
+              else { setMonthlyStartDate(undefined); setMonthlyMonths(undefined); }
+            }}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="flexible">Por días</TabsTrigger>
                 <TabsTrigger value="monthly">Por meses</TabsTrigger>
@@ -434,6 +433,12 @@ export function BookingWidget({
                   ${priceInfo.renterTotal.toLocaleString()}
                 </span>
               </div>
+              {effectiveMode === 'monthly' && (
+                <div className="text-xs text-muted-foreground space-y-1 pt-1">
+                  <p>• El cobro se realiza mensualmente.</p>
+                  <p>• Podés cancelar en cualquier momento.</p>
+                </div>
+              )}
             </div>
           )}
 

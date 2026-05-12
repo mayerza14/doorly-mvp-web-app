@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
@@ -22,6 +21,8 @@ interface FiltersPanelProps {
   setTipo: (value: string) => void;
   modoReserva: 'todos' | 'flexible' | 'monthly';
   setModoReserva: (value: 'todos' | 'flexible' | 'monthly') => void;
+  precioMin: number;
+  setPrecioMin: (value: number) => void;
   precioMax: number;
   setPrecioMax: (value: number) => void;
   tamanoMin: number;
@@ -49,6 +50,8 @@ export function FiltersPanel({
   setTipo,
   modoReserva,
   setModoReserva,
+  precioMin,
+  setPrecioMin,
   precioMax,
   setPrecioMax,
   tamanoMin,
@@ -119,25 +122,22 @@ export function FiltersPanel({
           </Select>
         </div>
 
-        {/* Precio máximo */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="precio">
-              {modoReserva === 'monthly' ? 'Precio máximo por mes' : 'Precio máximo por día'}
-            </Label>
-            <span className="text-sm font-medium text-foreground">
-              ${precioMax.toLocaleString()}
-            </span>
+          <Label>{modoReserva === 'monthly' ? 'Precio por mes' : 'Precio por día'}</Label>
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              placeholder="Mínimo"
+              value={precioMin || ""}
+              onChange={(e) => setPrecioMin(Number(e.target.value))}
+            />
+            <Input
+              type="number"
+              placeholder="Máximo"
+              value={precioMax || ""}
+              onChange={(e) => setPrecioMax(Number(e.target.value))}
+            />
           </div>
-          <Slider
-            id="precio"
-            min={500}
-            max={maxPrecio}
-            step={500}
-            value={[precioMax]}
-            onValueChange={(value) => setPrecioMax(value[0])}
-            className="mt-2"
-          />
         </div>
 
         {/* Tamaño mínimo */}

@@ -32,6 +32,7 @@ export default function BuscarPage() {
  
   const [zona, setZona] = useState("");
   const [tipo, setTipo] = useState("todos");
+  const [precioMin, setPrecioMin] = useState(0);
   const [precioMax, setPrecioMax] = useState(10000);
   const [tamanoMin, setTamanoMin] = useState(0);
   const [acceso24, setAcceso24] = useState(false);
@@ -49,7 +50,8 @@ export default function BuscarPage() {
 
   useEffect(() => {
     setPrecioMax(maxPrecio);
-  }, [modoReserva]);
+    setPrecioMin(0);
+  }, [maxPrecio]);
 
   // Cuenta cuántos filtros están activos para mostrar el badge
   const activeFilterCount = [
@@ -57,6 +59,7 @@ export default function BuscarPage() {
     tipo !== "todos",
     modoReserva !== "todos",
     precioMax < maxPrecio,
+    precioMin > 0,
     tamanoMin !== 0,
     acceso24,
     fitsSeleccionados.length > 0,
@@ -137,6 +140,7 @@ export default function BuscarPage() {
       }
       const priceToCheck = modoReserva === 'monthly' ? (listing.price_monthly ?? 0) : listing.price_daily;
       if (priceToCheck > precioMax) return false;
+      if (precioMin > 0 && priceToCheck < precioMin) return false;
       if (tamanoMin > 0 && (listing.size_m2 ?? 0) < tamanoMin) return false;
       if (acceso24 && listing.access_type !== "24_7") return false;
       if (fitsSeleccionados.length > 0) {
@@ -168,7 +172,7 @@ export default function BuscarPage() {
     }
 
     return results;
-  }, [listings, searchQuery, zona, tipo, modoReserva, precioMax, tamanoMin, acceso24, fitsSeleccionados, sortBy]);
+  }, [listings, searchQuery, zona, tipo, modoReserva, precioMin, precioMax, tamanoMin, acceso24, fitsSeleccionados, sortBy]);
  
   return (
     <AppShell>
@@ -214,6 +218,7 @@ export default function BuscarPage() {
                   zona={zona} setZona={setZona}
                   tipo={tipo} setTipo={setTipo}
                   modoReserva={modoReserva} setModoReserva={setModoReserva}
+                  precioMin={precioMin} setPrecioMin={setPrecioMin}
                   precioMax={precioMax} setPrecioMax={setPrecioMax}
                   tamanoMin={tamanoMin} setTamanoMin={setTamanoMin}
                   acceso24={acceso24} setAcceso24={setAcceso24}
