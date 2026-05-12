@@ -18,11 +18,18 @@ const sections = [
     title: "Cancelación por parte del guardador",
     content: (
       <>
-        <p>Si el guardador cancela una reserva confirmada, las condiciones de reembolso son:</p>
+        <p className="font-semibold text-foreground">Modo flexible</p>
+        <p className="mt-1">Si el guardador cancela una reserva confirmada en modo flexible, las condiciones de reembolso son:</p>
         <ul className="list-disc list-inside space-y-1.5 mt-2">
           <li><strong className="text-foreground">Más de 48 hs antes del inicio:</strong> reembolso completo</li>
           <li><strong className="text-foreground">Entre 24 y 48 hs antes:</strong> reembolso del 50%</li>
-          <li><strong className="text-foreground">Menos de 24 hs antes:</strong> sin reembolso</li>
+          <li><strong className="text-foreground">Menos de 24 hs antes:</strong> reembolso del 25%, salvo caso fortuito debidamente documentado</li>
+        </ul>
+        <p className="font-semibold text-foreground mt-4">Modo mensual</p>
+        <ul className="list-disc list-inside space-y-1.5 mt-2">
+          <li><strong className="text-foreground">Mes en curso:</strong> el mes ya abonado no es reembolsable, aunque el guardador desocupe el espacio antes de que finalice el período.</li>
+          <li><strong className="text-foreground">Meses futuros:</strong> los meses aún no cobrados no generan cargo alguno.</li>
+          <li><strong className="text-foreground">Aviso previo:</strong> para cancelar, el guardador debe notificar con al menos 7 días de anticipación al próximo vencimiento mensual. Si el aviso no se realiza en ese plazo y el cobro ya fue procesado, ese mes no es reembolsable.</li>
         </ul>
         <p className="mt-3">Los tiempos de acreditación dependen de Mercado Pago.</p>
       </>
@@ -56,7 +63,7 @@ const sections = [
     id: "comision-doorly",
     title: "Comisión de Doorly",
     content: (
-      <p>La comisión cobrada por Doorly por el uso de la plataforma no es reembolsable, excepto en los casos de cancelación por parte del anfitrión o ejercicio del derecho de arrepentimiento dentro del plazo legal.</p>
+      <p>La comisión cobrada por Doorly por el uso de la plataforma no es reembolsable, excepto en los casos de cancelación por parte del anfitrión o ejercicio del derecho de arrepentimiento dentro del plazo legal. En reservas de modo mensual, la comisión correspondiente al mes en curso no es reembolsable en ningún caso.</p>
     ),
   },
   {

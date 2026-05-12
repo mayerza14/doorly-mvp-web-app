@@ -70,7 +70,7 @@ const sections = [
     content: (
       <>
         <p><strong className="text-foreground">Modo flexible:</strong> El guardador reserva días o semanas según disponibilidad. El precio se cobra por día y es apto para necesidades puntuales o de corta duración.</p>
-        <p><strong className="text-foreground">Modo mensual:</strong> El guardador alquila el espacio por períodos de un mes completo. El precio se cobra por mes al inicio de cada período.</p>
+        <p><strong className="text-foreground">Modo mensual:</strong> El guardador alquila el espacio por períodos de un mes completo. El precio se cobra por mes al inicio de cada período. Cada publicación puede establecer una permanencia mínima en meses, que el guardador acepta al confirmar la reserva. El guardador puede cancelar en cualquier momento dando aviso con al menos 7 días de anticipación al próximo vencimiento mensual.</p>
         <p><strong className="text-foreground">Reembolso en modo mensual:</strong> El mes ya iniciado y abonado no es reembolsable. Si el guardador desocupa el espacio antes de que finalice el período en curso, no corresponde reembolso por los días restantes. La política de reembolso aplica únicamente sobre los meses futuros no iniciados.</p>
       </>
     ),
@@ -80,7 +80,7 @@ const sections = [
     title: "Cancelaciones",
     content: (
       <>
-        <p><strong className="text-foreground">7.1 Por parte del guardador:</strong> Las condiciones de reembolso dependen del momento en que se realice la cancelación y la política del espacio. Consultá la sección de Cancelaciones y Reembolsos para más detalle.</p>
+        <p><strong className="text-foreground">7.1 Por parte del guardador:</strong> Las condiciones de reembolso dependen del modo de reserva y el momento de la cancelación. En modo flexible aplican los plazos estándar (48 hs, 24–48 hs, menos de 24 hs); en modo mensual, el mes en curso ya abonado no es reembolsable. Consultá la sección de Cancelaciones y Reembolsos para más detalle.</p>
         <p><strong className="text-foreground">7.2 Por parte del anfitrión:</strong> En caso de cancelación por parte del anfitrión, se procesará el reembolso completo al guardador. Doorly podrá aplicar penalidades al anfitrión según corresponda.</p>
       </>
     ),
