@@ -86,19 +86,21 @@ export function BookingWidget({
     const renterCommission = calcRenterCommission(basePrice);
     const renterTotal = calcRenterTotal(basePrice);
 
-    return { days, basePrice, breakdown, rateType, renterCommission, renterTotal };
+    return { days, basePrice, breakdown, rateType, renterCommission, renterTotal, fullBasePrice: undefined as number | undefined };
   };
 
   const calculatePriceMonthly = () => {
     if (!monthlyStartDate || !monthlyMonths) return null;
 
-    const basePrice = monthlyMonths * (listing.priceMonthly || 0);
-    const renterCommission = calcRenterCommission(basePrice);
-    const renterTotal = calcRenterTotal(basePrice);
+    const firstMonthBase = listing.priceMonthly || 0;
+    const fullBasePrice = monthlyMonths * firstMonthBase;
+    const renterCommission = calcRenterCommission(firstMonthBase);
+    const renterTotal = calcRenterTotal(firstMonthBase);
 
     return {
       days: monthlyMonths * 30,
-      basePrice,
+      basePrice: firstMonthBase,
+      fullBasePrice,
       breakdown: `${monthlyMonths} mes(es)`,
       rateType: "mensual",
       renterCommission,
@@ -384,14 +386,25 @@ export function BookingWidget({
 
           {priceInfo && (
             <div className="space-y-3 pt-4 border-t border-border">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  Reserva por {priceInfo.breakdown}
-                </span>
-                <span className="font-medium">
-                  ${priceInfo.basePrice.toLocaleString()}
-                </span>
-              </div>
+              {effectiveMode === 'monthly' ? (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Total {priceInfo.breakdown}
+                  </span>
+                  <span className="font-medium">
+                    ${priceInfo.fullBasePrice!.toLocaleString()}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Reserva por {priceInfo.breakdown}
+                  </span>
+                  <span className="font-medium">
+                    ${priceInfo.basePrice.toLocaleString()}
+                  </span>
+                </div>
+              )}
 
               <div className="flex justify-between text-sm">
                 <div className="flex flex-col">
@@ -427,7 +440,7 @@ export function BookingWidget({
 
               <div className="flex justify-between items-center border-t border-dashed pt-4 mt-2">
                 <span className="text-base font-bold text-foreground">
-                  Total a pagar
+                  {effectiveMode === 'monthly' ? 'Pagás hoy' : 'Total a pagar'}
                 </span>
                 <span className="text-2xl font-black text-primary">
                   ${priceInfo.renterTotal.toLocaleString()}
