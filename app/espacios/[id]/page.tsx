@@ -45,7 +45,7 @@ export async function generateMetadata({
     };
   }
 
-  const metaTitle = `${listing.space_type || "Espacio"} en ${listing.area_label || "Argentina"} — ${listing.title || "Espacio privado"} | Doorly`;
+  const metaTitle = `${listing.space_type || "Espacio"} en ${listing.area_label || "Argentina"} | Doorly`;
   const metaDescription = listing.description
     ? listing.description.slice(0, 155)
     : "Encontrá este espacio privado en Doorly y reservá online con Mercado Pago.";
