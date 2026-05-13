@@ -37,6 +37,9 @@ export const metadata: Metadata = {
     title: 'Almacenamiento y Estacionamiento Privado en Argentina | Doorly',
     description: 'Encontrá espacios privados para guardar tus cosas o estacionar cerca tuyo. Reservá online y pagá con Mercado Pago.',
   },
+  verification: {
+    google: '-vVzZbmrZd_YlquWYdf4sWScN_rwq4k_E2K53imus_c',
+  },
   icons: {
     icon: [
       {
