@@ -2,7 +2,8 @@ import { LegalPageLayout } from "@/components/legal-page-layout";
 import { FileText } from "lucide-react";
 
 export const metadata = {
-  title: "Términos y Condiciones — Doorly",
+  title: "Términos y Condiciones | Doorly",
+  description: "Leé los Términos y Condiciones de Doorly. Conocé las reglas de uso de la plataforma para propietarios y usuarios.",
   alternates: {
     canonical: "https://www.doorly.com.ar/terminos",
   },

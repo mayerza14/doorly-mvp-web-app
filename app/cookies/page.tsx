@@ -2,7 +2,7 @@ import { LegalPageLayout } from "@/components/legal-page-layout";
 import { Cookie } from "lucide-react";
 
 export const metadata = {
-  title: "Política de Cookies — Doorly",
+  title: "Política de Cookies | Doorly",
   alternates: {
     canonical: "https://www.doorly.com.ar/cookies",
   },

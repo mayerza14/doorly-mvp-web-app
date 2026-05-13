@@ -2,7 +2,8 @@ import { LegalPageLayout } from "@/components/legal-page-layout";
 import { Shield } from "lucide-react";
 
 export const metadata = {
-  title: "Política de Privacidad — Doorly",
+  title: "Política de Privacidad | Doorly",
+  description: "Conocé la Política de Privacidad de Doorly. Cómo tratamos y protegemos tus datos personales en la plataforma.",
   alternates: {
     canonical: "https://www.doorly.com.ar/privacidad",
   },

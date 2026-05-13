@@ -4,10 +4,14 @@ import Link from "next/link";
 import { MessageCircle, Search, Package, Home, HelpCircle } from "lucide-react";
 
 export const metadata = {
-  title: "Preguntas Frecuentes — Doorly",
+  title: "Preguntas Frecuentes | Doorly",
   description: "Todo lo que necesitás saber sobre cómo usar Doorly para guardar o publicar un espacio.",
   alternates: {
     canonical: "https://www.doorly.com.ar/faq",
+  },
+  openGraph: {
+    title: "Preguntas Frecuentes | Doorly",
+    description: "Todo lo que necesitás saber sobre cómo usar Doorly para guardar o publicar un espacio.",
   },
 };
 

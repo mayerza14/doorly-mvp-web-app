@@ -1,0 +1,10 @@
+{
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "doorly.com.ar" }],
+      "destination": "https://www.doorly.com.ar/:path*",
+      "permanent": true
+    }
+  ]
+}
