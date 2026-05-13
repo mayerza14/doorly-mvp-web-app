@@ -10,9 +10,33 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Doorly - Almacenamiento y Estacionamiento Privado',
-  description: 'Encontrá espacios privados para almacenar y estacionar cerca tuyo. Confiable, seguro y flexible.',
-  generator: 'v0.app',
+  title: 'Almacenamiento y Estacionamiento Privado en Argentina | Doorly',
+  description: 'Encontrá espacios privados para guardar tus cosas o estacionar cerca tuyo. Reservá online y pagá con Mercado Pago.',
+  metadataBase: new URL('https://www.doorly.com.ar'),
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: 'Almacenamiento y Estacionamiento Privado en Argentina | Doorly',
+    description: 'Encontrá espacios privados para guardar tus cosas o estacionar cerca tuyo. Reservá online y pagá con Mercado Pago.',
+    url: 'https://www.doorly.com.ar',
+    siteName: 'Doorly',
+    locale: 'es_AR',
+    type: 'website',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Doorly - Almacenamiento y Estacionamiento Privado',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Almacenamiento y Estacionamiento Privado en Argentina | Doorly',
+    description: 'Encontrá espacios privados para guardar tus cosas o estacionar cerca tuyo. Reservá online y pagá con Mercado Pago.',
+  },
   icons: {
     icon: [
       {
