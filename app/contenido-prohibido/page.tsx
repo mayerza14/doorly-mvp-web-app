@@ -3,6 +3,9 @@ import { Ban } from "lucide-react";
 
 export const metadata = {
   title: "Contenido Prohibido — Doorly",
+  alternates: {
+    canonical: "https://www.doorly.com.ar/contenido-prohibido",
+  },
 };
 
 const sections = [

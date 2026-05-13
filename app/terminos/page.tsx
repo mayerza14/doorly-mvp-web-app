@@ -3,6 +3,9 @@ import { FileText } from "lucide-react";
 
 export const metadata = {
   title: "Términos y Condiciones — Doorly",
+  alternates: {
+    canonical: "https://www.doorly.com.ar/terminos",
+  },
 };
 
 const sections = [

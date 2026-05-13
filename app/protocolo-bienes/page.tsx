@@ -3,6 +3,9 @@ import { ClipboardList } from "lucide-react";
 
 export const metadata = {
   title: "Protocolo de Bienes — Doorly",
+  alternates: {
+    canonical: "https://www.doorly.com.ar/protocolo-bienes",
+  },
 };
 
 const sections = [

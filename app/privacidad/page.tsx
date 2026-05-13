@@ -3,6 +3,9 @@ import { Shield } from "lucide-react";
 
 export const metadata = {
   title: "Política de Privacidad — Doorly",
+  alternates: {
+    canonical: "https://www.doorly.com.ar/privacidad",
+  },
 };
 
 const sections = [

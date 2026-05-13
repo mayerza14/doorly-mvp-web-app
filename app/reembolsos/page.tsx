@@ -3,6 +3,9 @@ import { RefreshCw } from "lucide-react";
 
 export const metadata = {
   title: "Cancelaciones y Reembolsos — Doorly",
+  alternates: {
+    canonical: "https://www.doorly.com.ar/reembolsos",
+  },
 };
 
 const sections = [

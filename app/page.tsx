@@ -23,7 +23,7 @@ export default function HomePage() {
         <div className="container px-4">
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl text-balance">
-              Encuentra tu espacio de almacenamiento perfecto
+              Encontrá tu espacio de almacenamiento perfecto
             </h1>
             <p className="mt-6 text-lg text-muted-foreground leading-relaxed text-pretty">
               Encontrá el lugar perfecto para guardar tus cosas o estacionar tu

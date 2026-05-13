@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { AppShell } from "@/components/app-shell";
 import { BookingWidget } from "@/components/booking-widget";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,66 @@ import { DoorlyCertifiedBadge } from "@/components/doorly-certified-badge";
 import { ListingQuestions } from "@/components/listing-questions";
 
 export const revalidate = 0;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+
+  const { data: listing } = await supabase
+    .from("listings")
+    .select("title, description, space_type, area_label")
+    .eq("id", id)
+    .single();
+
+  const { data: photoData } = await supabase
+    .from("listing_photos")
+    .select("url")
+    .eq("listing_id", id)
+    .order("position", { ascending: true })
+    .limit(1);
+
+  if (!listing) {
+    return {
+      title: "Espacio privado | Doorly",
+      description:
+        "Encontrá este espacio privado en Doorly y reservá online con Mercado Pago.",
+    };
+  }
+
+  const metaTitle = `${listing.space_type || "Espacio"} en ${listing.area_label || "Argentina"} — ${listing.title || "Espacio privado"} | Doorly`;
+  const metaDescription = listing.description
+    ? listing.description.slice(0, 155)
+    : "Encontrá este espacio privado en Doorly y reservá online con Mercado Pago.";
+  const canonical = `https://www.doorly.com.ar/espacios/${id}`;
+  const ogImage = photoData?.[0]?.url ?? "/og-image.png";
+
+  return {
+    title: metaTitle,
+    description: metaDescription,
+    alternates: {
+      canonical,
+    },
+    openGraph: {
+      title: metaTitle,
+      description: metaDescription,
+      url: canonical,
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: listing.title || "Espacio privado",
+        },
+      ],
+      type: "website",
+      locale: "es_AR",
+      siteName: "Doorly",
+    },
+  };
+}
 
 function getApproxCoords(lat: number, lng: number, id: string) {
   const seed = id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);

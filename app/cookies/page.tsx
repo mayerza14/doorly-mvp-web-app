@@ -3,6 +3,9 @@ import { Cookie } from "lucide-react";
 
 export const metadata = {
   title: "Política de Cookies — Doorly",
+  alternates: {
+    canonical: "https://www.doorly.com.ar/cookies",
+  },
 };
 
 const sections = [
