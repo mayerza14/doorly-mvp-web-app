@@ -178,6 +178,25 @@ const sections = [
 export default function FaqPage() {
   return (
     <AppShell>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": sections.flatMap((section) =>
+              section.questions.map((item) => ({
+                "@type": "Question",
+                "name": item.q,
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": item.a,
+                },
+              }))
+            ),
+          }),
+        }}
+      />
       {/* Hero */}
       <div className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-primary/10 border-b border-border">
         <div className="absolute inset-0 bg-grid-primary/[0.02] pointer-events-none" />
