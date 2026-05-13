@@ -67,6 +67,39 @@ export default function RootLayout({
   return (
     <html lang="es-AR">
       <body className={`font-sans antialiased`}>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "Organization",
+                  "@id": "https://www.doorly.com.ar/#organization",
+                  "name": "Doorly",
+                  "url": "https://www.doorly.com.ar",
+                  "logo": "https://www.doorly.com.ar/og-image.png",
+                  "email": "soporte.doorly@gmail.com",
+                  "description": "Marketplace argentino que conecta propietarios de espacios privados con personas que necesitan guardar pertenencias o estacionar vehículos.",
+                  "areaServed": {
+                    "@type": "Country",
+                    "name": "Argentina"
+                  }
+                },
+                {
+                  "@type": "WebSite",
+                  "@id": "https://www.doorly.com.ar/#website",
+                  "url": "https://www.doorly.com.ar",
+                  "name": "Doorly",
+                  "publisher": {
+                    "@id": "https://www.doorly.com.ar/#organization"
+                  },
+                  "inLanguage": "es-AR"
+                }
+              ]
+            })
+          }}
+        />
         <AuthProvider>
           {children}
         </AuthProvider>
