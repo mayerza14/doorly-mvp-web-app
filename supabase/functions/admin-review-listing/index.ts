@@ -184,6 +184,28 @@ Deno.serve(async (req) => {
                       </tr>
                     </table>
 
+                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
+                      <tr>
+                        <td style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:18px 20px;">
+                          <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#0369a1;">🏅 ¿Querés destacarte? Solicitá el Certificado Doorly</p>
+                          <p style="margin:0;font-size:13px;color:#0c4a6e;line-height:1.6;">Los espacios certificados tienen una insignia visible que genera más confianza en quienes buscan espacio — y eso se traduce en más reservas y más ingresos para vos. Un miembro del equipo Doorly visita tu espacio y verifica que es tal como lo describiste. Si pasa la revisión, tu publicación recibe la insignia de Certificado Doorly. Para solicitarlo: ingresá a tu panel, buscá tu publicación y hacé clic en <strong>Solicitar certificación</strong>.</p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">
+                      <tr>
+                        <td align="center">
+                          <a href="${SITE_URL}/dashboard"
+                             style="display:inline-block;background:#0369a1;color:#ffffff;padding:14px 32px;
+                                    border-radius:10px;text-decoration:none;font-weight:600;font-size:15px;
+                                    letter-spacing:0.3px;width:100%;box-sizing:border-box;text-align:center;">
+                            Ir a mi panel →
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+
                   </td>
                 </tr>
               </table>
