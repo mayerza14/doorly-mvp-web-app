@@ -3,7 +3,11 @@
     "allow": [
       "PowerShell(@\\(\"C:\\\\Program Files\\\\nodejs\\\\npx.cmd\", \"$env:APPDATA\\\\npm\\\\npx.cmd\", \"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\\\\npx.cmd\"\\) | ForEach-Object { if \\(Test-Path $_\\) { Write-Output \"Found: $_\" } })",
       "Bash(npx tsc *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\marco\\\\OneDrive\\\\Desktop\\\\Doorly1\\\\doorly-mvp-web-app\" -Directory -Depth 2)",
+      "Bash(Select-Object FullName)",
+      "Bash(find \"c:/Users/marco/OneDrive/Desktop/Doorly1\" -type d -name \"functions\" | grep -v node_modules)",
+      "Read(//c/Users/marco/OneDrive/Desktop/Doorly1/**)"
     ]
   }
 }

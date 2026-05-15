@@ -227,7 +227,7 @@ export default function AdminPage() {
                                 <X className="h-4 w-4 mr-1" />Rechazar
                               </Button>
                               <Button size="sm" variant="outline" asChild>
-                                <Link href={`/espacios/${listing.id}`} target="_blank">
+                                <Link href={`/admin/listings/${listing.id}/preview`} target="_blank">
                                   <Eye className="h-4 w-4" />
                                 </Link>
                               </Button>
@@ -303,7 +303,7 @@ export default function AdminPage() {
                               <Pause className="h-4 w-4 mr-1" />Suspender
                             </Button>
                             <Button size="sm" variant="ghost" asChild>
-                              <Link href={`/espacios/${listing.id}`} target="_blank">
+                              <Link href={`/admin/listings/${listing.id}/preview`} target="_blank">
                                 <Eye className="h-4 w-4" />
                               </Link>
                             </Button>
