@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, Clock, ChevronLeft, ChevronRight, Package } from "lucide-react";
+import { DoorlyCertifiedBadge } from "@/components/doorly-certified-badge";
 
 interface ListingCardProps {
   listing: any;
@@ -116,6 +117,12 @@ export function ListingCard({ listing }: ListingCardProps) {
             {listing.spaceType}
           </Badge>
         </div>
+
+        {listing.doorly_certified && (
+          <div className="mb-2">
+            <DoorlyCertifiedBadge size="sm" />
+          </div>
+        )}
 
         <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
           <MapPin className="h-4 w-4" />

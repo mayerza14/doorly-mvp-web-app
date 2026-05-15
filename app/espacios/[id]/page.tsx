@@ -13,6 +13,7 @@ import { ListingMap } from "@/components/listing-map";
 import { ReviewsSection } from "@/components/reviews-section";
 import { PhotoCarousel } from "@/components/photo-carousel";
 import { DoorlyCertifiedBadge } from "@/components/doorly-certified-badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ListingQuestions } from "@/components/listing-questions";
 
 export const revalidate = 0;
@@ -209,7 +210,18 @@ export default async function EspacioDetailPage({
                       Acceso 24/7
                     </Badge>
                   )}
-                  {listing.doorly_certified && <DoorlyCertifiedBadge size="md" />}
+                  {listing.doorly_certified && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-default">
+                          <DoorlyCertifiedBadge size="md" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs text-center">
+                        Espacio Certificado Doorly — Un miembro de nuestro equipo visitó y verificó este espacio. Lo que ves es exactamente lo que vas a encontrar.
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
 
                 <h1 className="text-xl md:text-2xl font-bold text-foreground leading-tight mb-2">
